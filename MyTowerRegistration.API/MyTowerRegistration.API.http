@@ -1,6 +1,103 @@
-@MyTowerRegistration.API_HostAddress = http://localhost:5026
-
-GET {{MyTowerRegistration.API_HostAddress}}/weatherforecast/
-Accept: application/json
-
+### =============================================================================
+### GraphQL Test Requests — use Visual Studio's .http file support
+### or REST Client extension in VS Code.
 ###
+### Hot Chocolate serves GraphQL at /graphql by default.
+### All requests are POST with Content-Type: application/json.
+### =============================================================================
+
+@baseUrl = http://localhost:5026
+
+### --- Register a new user ---------------------------------------------------
+
+POST {{baseUrl}}/graphql
+Content-Type: application/json
+
+{
+  "query": "mutation RegisterUser($input: RegisterUserInput!) { registerUser(input: $input) { user { id username email createdAt } errors { message code } } }",
+  "variables": {
+    "input": {
+      "username": "ryanshinra",
+      "email": "ryan@shinra.com",
+      "password": "Mako-Reactor-1"
+    }
+  }
+}
+
+### --- Register another user (to test uniqueness validation) -----------------
+
+POST {{baseUrl}}/graphql
+Content-Type: application/json
+
+{
+  "query": "mutation RegisterUser($input: RegisterUserInput!) { registerUser(input: $input) { user { id username email createdAt } errors { message code } } }",
+  "variables": {
+    "input": {
+      "username": "cloudstrife",
+      "email": "cloud@avalanche.org",
+      "password": "Buster-Sword-99"
+    }
+  }
+}
+
+### --- Try registering duplicate username (expect USERNAME_TAKEN error) ------
+
+POST {{baseUrl}}/graphql
+Content-Type: application/json
+
+{
+  "query": "mutation RegisterUser($input: RegisterUserInput!) { registerUser(input: $input) { user { id username email createdAt } errors { message code } } }",
+  "variables": {
+    "input": {
+      "username": "ryanshinra",
+      "email": "different@email.com",
+      "password": "SomePassword123"
+    }
+  }
+}
+
+### --- Try registering with invalid email (expect INVALID_EMAIL error) -------
+
+POST {{baseUrl}}/graphql
+Content-Type: application/json
+
+{
+  "query": "mutation RegisterUser($input: RegisterUserInput!) { registerUser(input: $input) { user { id username email createdAt } errors { message code } } }",
+  "variables": {
+    "input": {
+      "username": "badsyntax",
+      "email": "not-an-email",
+      "password": "Password123"
+    }
+  }
+}
+
+### --- Query a single user by ID --------------------------------------------
+
+POST {{baseUrl}}/graphql
+Content-Type: application/json
+
+{
+  "query": "query GetUser($id: Int!) { user(id: $id) { id username email createdAt } }",
+  "variables": {
+    "id": 1
+  }
+}
+
+### --- Query all users -------------------------------------------------------
+
+POST {{baseUrl}}/graphql
+Content-Type: application/json
+
+{
+  "query": "{ users { id username email createdAt } }"
+}
+
+### --- Introspection query (check your schema) -------------------------------
+
+POST {{baseUrl}}/graphql
+Content-Type: application/json
+
+{
+  "query": "{ __schema { queryType { name } mutationType { name } types { name kind } } }"
+}
