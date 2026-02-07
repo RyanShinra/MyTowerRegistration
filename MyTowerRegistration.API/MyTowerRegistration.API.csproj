@@ -7,7 +7,22 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Hot Chocolate GraphQL server for ASP.NET Core (includes Nitro IDE at /graphql) -->
+    <PackageReference Include="HotChocolate.AspNetCore" Version="15.1.12" />
+
+    <!-- OpenAPI support (came with the template, keep it) -->
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
+
+    <!-- EF Core Design package — needed for `dotnet ef migrations` CLI commands -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- Project reference: API depends on Data layer -->
+  <ItemGroup>
+    <ProjectReference Include="..\MyTowerRegistration.Data\MyTowerRegistration.Data.csproj" />
   </ItemGroup>
 
 </Project>
