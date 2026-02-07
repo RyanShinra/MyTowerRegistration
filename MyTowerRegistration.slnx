@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="MyTowerRegistration.API/MyTowerRegistration.API.csproj" />
+  <Project Path="MyTowerRegistration.Data/MyTowerRegistration.Data.csproj" />
+  <Project Path="MyTowerRegistration.Tests/MyTowerRegistration.Tests.csproj" />
+</Solution>
