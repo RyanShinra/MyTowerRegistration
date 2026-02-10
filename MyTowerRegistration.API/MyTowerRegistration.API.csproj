@@ -13,6 +13,7 @@
 
     <!-- OpenAPI support (came with the template, keep it) -->
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Analyzers" Version="10.0.3" />
 
     <!-- EF Core Design package — needed for `dotnet ef migrations` CLI commands -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
