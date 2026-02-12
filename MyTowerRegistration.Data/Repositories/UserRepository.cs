@@ -52,7 +52,7 @@ public class UserRepository : IUserRepository
     // TODO 4: Implement GetAllAsync()
     //   - Use: await _context.Users.ToListAsync()
     //   - For production, add pagination! This is fine for a demo.
-    public async Task<List<User>> GetAllAsync()
+    public async Task<IReadOnlyList<User>> GetAllAsync()
     {
         return await Context.Users.ToListAsync();
     }

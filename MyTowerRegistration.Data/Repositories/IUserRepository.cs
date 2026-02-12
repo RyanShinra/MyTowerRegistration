@@ -52,5 +52,4 @@ public interface IUserRepository
     // TODO 6: Task<bool> EmailExistsAsync(string email)
     //   - Same pattern as UsernameExistsAsync
     Task<bool> EmailExistsAsync(string email);
-    Task<UserById> GetByIdsAsync(IReadOnlyList<int> ids, CancellationToken ct);
 }
