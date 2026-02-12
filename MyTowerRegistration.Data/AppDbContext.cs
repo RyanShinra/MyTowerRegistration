@@ -33,7 +33,7 @@ public class AppDbContext : DbContext
     //   - DbSet<T> is like a "table reference" — it's your query entry point
     //   - Usage: await _context.Users.FindAsync(id)
     //   - Compare to Prisma: prisma.user.findUnique(...)
-    DbSet<User> Users = null!;
+    public DbSet<User> Users { get; set; } = null!;
 
     // TODO 3: Override OnModelCreating(ModelBuilder modelBuilder)
     //   - This is the "Fluent API" — an alternative to data annotations for
