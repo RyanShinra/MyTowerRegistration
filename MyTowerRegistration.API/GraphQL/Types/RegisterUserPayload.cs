@@ -29,7 +29,7 @@ namespace MyTowerRegistration.API.GraphQL.Types;
 //   - IReadOnlyList<UserError>? Errors  (nullable — null when no errors)
 //
 //   Syntax: public record RegisterUserPayload(User? User, IReadOnlyList<UserError>? Errors);
-//
+    public record RegisterUserPayload(User? User, IReadOnlyList<UserError>? Errors);
 //   You'll construct it in the mutation like:
 //     Success: new RegisterUserPayload(user, null)
 //     Failure: new RegisterUserPayload(null, [new UserError("msg", "CODE")])
