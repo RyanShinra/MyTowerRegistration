@@ -36,7 +36,7 @@ namespace MyTowerRegistration.API.GraphQL.Mutations;
 public class UserMutations
 {
     // TODO 1: Implement RegisterUser
-    //
+    
     //   public async Task<RegisterUserPayload> RegisterUser(
     //       RegisterUserInput input,
     //       [Service] IUserRepository repository)
