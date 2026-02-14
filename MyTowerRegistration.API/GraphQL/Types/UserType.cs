@@ -26,21 +26,18 @@ namespace MyTowerRegistration.API.GraphQL.Types;
 /// </summary>
 public class UserType : ObjectType<User>
 {
-    // TODO 1: Override Configure(IObjectTypeDescriptor<User> descriptor)
-    //   - Set the GraphQL type name: descriptor.Name("User")
-    //   - (Optional) Add a description: descriptor.Description("A registered user")
+  
+    protected override void Configure(IObjectTypeDescriptor<User> descriptor)
+    {
+        base.Configure(descriptor);
+        descriptor.Name("User");
+        descriptor.Description("A registered user");
+        descriptor.Field((User user) => user.Id).Type<NonNullType<IntType>>();
+        descriptor.Field((User user) => user.Username).Type<NonNullType<StringType>>();
+        descriptor.Field((User user) => user.Email).Type<NonNullType<StringType>>();  // Fixed: was IntType
+        descriptor.Field((User user) => user.CreatedAt).Type<NonNullType<DateTimeType>>();
 
-    // TODO 2: Expose the fields you want in the schema:
-    //   descriptor.Field(u => u.Id).Type<NonNullType<IntType>>();
-    //   descriptor.Field(u => u.Username).Type<NonNullType<StringType>>();
-    //   descriptor.Field(u => u.Email).Type<NonNullType<StringType>>();
-    //   descriptor.Field(u => u.CreatedAt).Type<NonNullType<DateTimeType>>();
-    //
-    //   NOTE: Hot Chocolate can also infer types from C# types. The explicit
-    //   .Type<>() calls are optional but make the schema self-documenting.
-
-    // TODO 3: IMPORTANT — Ignore the PasswordHash field!
-    //   descriptor.Field(u => u.PasswordHash).Ignore();
-    //   This prevents PasswordHash from ever appearing in the GraphQL schema.
-    //   Security rule: never expose sensitive data through your API.
+        // Security: never expose password hash
+        descriptor.Field(u => u.PasswordHash).Ignore();
+    }
 }

@@ -27,3 +27,4 @@ namespace MyTowerRegistration.API.GraphQL.Types;
 //   Hot Chocolate auto-maps records to GraphQL types — no ObjectType<T>
 //   descriptor needed for simple DTOs like this. The record properties
 //   become fields automatically.
+public record UserError(string Message, string Code);

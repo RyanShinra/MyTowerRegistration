@@ -29,7 +29,7 @@ namespace MyTowerRegistration.API.GraphQL.Types;
 //   - string Email
 //   - string Password
 //
-//   Syntax: public record RegisterUserInput(string Username, string Email, string Password);
+public record RegisterUserInput(string Username, string Email, string Password);
 //
 //   This single line generates:
 //   - A constructor
