@@ -48,6 +48,10 @@ public class UserQueries
     //   - Method name "GetUser" → schema field name "user" (HC strips "Get" prefix)
     //
     //   Compare to Apollo: same as calling dataLoader.load(id) in a resolver
+    public async Task<User?> GetUserAsync(int userId, UserBatchDataLoader loader)
+    {
+        return await loader.LoadAsync(userId);
+    }
 
     // TODO 2: Implement GetUsers — list all users
     //
@@ -62,4 +66,9 @@ public class UserQueries
     //   - This is like using @Inject() in NestJS or accessing context.dataSources in Apollo
     //   - Returns non-nullable list of non-nullable users: [User!]!
     //   - For production, you'd add pagination (Hot Chocolate has [UsePaging])
+
+    public async Task<IReadOnlyList<User>> GetUsersAsync([Service] IUserRepository userRepo)
+    {
+        return await userRepo.GetAllAsync();
+    }
 }
