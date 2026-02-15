@@ -66,7 +66,7 @@ public class User
     //   - EF Core needs this to materialize entities from the database
     //   - You can set default values here (e.g., CreatedAt = DateTime.UtcNow)
     //   - In TypeScript you'd do this in the constructor or with default values
-    User()
+    public User()
     {
         CreatedAt = DateTime.UtcNow;
     }
