@@ -38,7 +38,7 @@ public interface IUserRepository
     //   - Returns a dictionary so the DataLoader can map each ID to its User
     //   - CancellationToken lets ASP.NET Core cancel if the client disconnects
     //   - Compare to: async getByIds(ids: number[]): Promise<Map<number, User>>
-    Task<UserById> GetByIdsAsync(IReadOnlyList<int> ids, CancellationToken ct);
+    Task<UserByIdDictionary> GetByIdsAsync(IReadOnlyList<int> ids, CancellationToken ct);
 
     // TODO 4: Task<User> AddAsync(User user)
     //   - Inserts a new user and returns it (with the DB-generated Id populated)

@@ -63,7 +63,7 @@ public class UserRepository : IUserRepository
     //              .ToDictionaryAsync(u => u.Id, ct)
     //   - The .Contains() translates to SQL: WHERE "Id" IN (1, 2, 3, ...)
     //   - This is the batch query that makes DataLoader efficient
-    public async Task<UserById> GetByIdsAsync(IReadOnlyList<int> searchIds, CancellationToken ct)
+    public async Task<UserByIdDictionary> GetByIdsAsync(IReadOnlyList<int> searchIds, CancellationToken ct)
     {
         return await Context.Users
             .Where(user => searchIds.Contains(user.Id))
