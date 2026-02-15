@@ -47,9 +47,9 @@ public interface IUserRepository
     // TODO 5: Task<bool> UsernameExistsAsync(string username)
     //   - Check for uniqueness before inserting (application-level validation)
     //   - The DB unique index is a safety net; this gives better error messages
-    Task<bool> UsernameExistsAsync(string username);
+    Task<bool> UsernameExistsAsync(string username, CancellationToken ct);
 
     // TODO 6: Task<bool> EmailExistsAsync(string email)
     //   - Same pattern as UsernameExistsAsync
-    Task<bool> EmailExistsAsync(string email);
+    Task<bool> EmailExistsAsync(string email, CancellationToken ct);
 }

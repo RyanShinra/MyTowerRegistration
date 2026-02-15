@@ -88,15 +88,15 @@ public class UserRepository : IUserRepository
     // TODO 7: Implement UsernameExistsAsync(string username)
     //   - Use: await _context.Users.AnyAsync(u => u.Username == username)
     //   - AnyAsync is more efficient than CountAsync — it short-circuits
-    public async Task<bool> UsernameExistsAsync(string searchUsername)
+    public async Task<bool> UsernameExistsAsync(string searchUsername, CancellationToken ct)
     {
-        return await Context.Users.AnyAsync(user => user.Username == searchUsername);
+        return await Context.Users.AnyAsync(user => user.Username == searchUsername, ct);
     }
 
     // TODO 8: Implement EmailExistsAsync(string email)
     //   - Same pattern, check u.Email == email
-    public async Task<bool> EmailExistsAsync(string searchEmail)
+    public async Task<bool> EmailExistsAsync(string searchEmail, CancellationToken ct)
     {
-        return await Context.Users.AnyAsync(user => user.Email == searchEmail);
+        return await Context.Users.AnyAsync(user => user.Email == searchEmail, ct);
     }
 }
