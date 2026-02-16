@@ -12,7 +12,6 @@
 // =============================================================================
 
 using MyTowerRegistration.Data.Models;
-using System.Runtime.InteropServices.Marshalling;
 
 namespace MyTowerRegistration.Data.Repositories;
 
