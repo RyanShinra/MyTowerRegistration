@@ -31,7 +31,7 @@ namespace MyTowerRegistration.API.GraphQL.Queries;
 /// GraphQL query resolvers for User operations.
 /// Each public method becomes a field on the Query type.
 /// </summary>
-[QueryType]
+//[QueryType]
 public class UserQueries
 {
     // TODO 1: Implement GetUser — single user by ID via DataLoader
