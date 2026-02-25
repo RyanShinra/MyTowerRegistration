@@ -53,7 +53,7 @@ public class UserBatchDataLoader : BatchDataLoader<int, User>
         IUserRepository repository, 
         IBatchScheduler batchScheduler, 
         DataLoaderOptions? options = null) 
-        : base(batchScheduler, options)
+        : base(batchScheduler, options ?? new DataLoaderOptions())
     {
         _repository = repository;
     }
