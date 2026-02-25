@@ -48,9 +48,9 @@ public class UserQueries
     //   - Method name "GetUser" → schema field name "user" (HC strips "Get" prefix)
     //
     //   Compare to Apollo: same as calling dataLoader.load(id) in a resolver
-    public async Task<User?> GetUserAsync(int userId, UserBatchDataLoader loader)
+    public async Task<User?> GetUserAsync(int id, UserBatchDataLoader loader)
     {
-        return await loader.LoadAsync(userId);
+        return await loader.LoadAsync(id);
     }
 
     // TODO 2: Implement GetUsers — list all users
