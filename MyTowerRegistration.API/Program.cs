@@ -50,7 +50,7 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 //   Compare to Node.js:
 //     const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 //   But here it's managed by DI — you never manually create/dispose connections.
-IServiceCollection serviceCollection = builder.Services.AddDbContext<AppDbContext>((DbContextOptionsBuilder options) => {
+builder.Services.AddDbContext<AppDbContext>((DbContextOptionsBuilder options) => {
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
 });
 
