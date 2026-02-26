@@ -4,7 +4,6 @@
 * text=auto eol=lf
 
 # Auto detect text files and normalize line endings to LF in the repository
-* text=auto
 
 # Explicitly declare text files you want normalized
 *.cs text eol=lf
