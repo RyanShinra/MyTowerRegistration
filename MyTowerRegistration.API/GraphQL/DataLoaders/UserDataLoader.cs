@@ -83,7 +83,6 @@ public class UserBatchDataLoader : BatchDataLoader<int, User>
 
     protected override async Task<IReadOnlyDictionary<int, User>> LoadBatchAsync(IReadOnlyList<int> userIds, CancellationToken ct)
     {
-        IDictionary<int, User> users = await _repository.GetByIdsAsync(userIds, ct);
-        return (IReadOnlyDictionary<int, User>) users;
+        return await _repository.GetByIdsAsync(userIds, ct);
     }
 }
