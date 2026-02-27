@@ -363,3 +363,4 @@ MigrationBackup/
 FodyWeavers.xsd
 /MyTowerRegistration.API/appsettings.Development.json
 /.claude
+.DS_Store
