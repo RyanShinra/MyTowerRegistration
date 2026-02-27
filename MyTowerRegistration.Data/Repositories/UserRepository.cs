@@ -66,11 +66,8 @@ public class UserRepository : IUserRepository
     public async Task<UserByIdDictionary> GetByIdsAsync(IReadOnlyList<int> searchIds, CancellationToken ct)
     {
         return await _context.Users
-            .Where(user => searchIds.Contains(user.Id))
-            .ToDictionaryAsync(keySelector: (User user) => {
-                // selects the field from `user` to be the key in the Dictionary
-                return user.Id;
-            }, ct); 
+            .Where(u => searchIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, ct);
     }
 
     // TODO 6: Implement AddAsync(User user)

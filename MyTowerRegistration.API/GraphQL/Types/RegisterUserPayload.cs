@@ -24,16 +24,4 @@ using MyTowerRegistration.Data.Models;
 
 namespace MyTowerRegistration.API.GraphQL.Types;
 
-// TODO 1: Create a C# record named RegisterUserPayload with two properties:
-//   - User? User          (nullable — null when registration fails)
-//   - IReadOnlyList<UserError>? Errors  (nullable — null when no errors)
-//
-//   Syntax: public record RegisterUserPayload(User? User, IReadOnlyList<UserError>? Errors);
-    public record RegisterUserPayload(User? User, IReadOnlyList<UserError>? Errors);
-//   You'll construct it in the mutation like:
-//     Success: new RegisterUserPayload(user, null)
-//     Failure: new RegisterUserPayload(null, [new UserError("msg", "CODE")])
-//
-//   NOTE: The User property will be projected through UserType, which hides
-//   the PasswordHash field. So even though the C# record holds the full User
-//   entity, the GraphQL response won't include the hash.
+public record RegisterUserPayload(User? User, IReadOnlyList<UserError>? Errors);
