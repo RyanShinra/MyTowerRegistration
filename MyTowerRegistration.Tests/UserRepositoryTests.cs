@@ -47,7 +47,7 @@ public class UserRepositoryTests
         var repo = new UserRepository(context);
 
         var user = new User { Username = "test", Email = "t@t.com", PasswordHash = "hash" };
-        var result = await repo.AddAsync(user);
+        var result = await repo.AddAsync(user, CancellationToken.None);
 
         Assert.True(result.Id > 0);  // InMemory auto-generates IDs
         Assert.Equal("test", result.Username);
@@ -65,7 +65,7 @@ public class UserRepositoryTests
         var repo = new UserRepository(context);
 
         var user = new User { Username = "find_me", Email = "f@m.com", PasswordHash = "hash" };
-        await repo.AddAsync(user);
+        await repo.AddAsync(user, CancellationToken.None);
 
         var found = await repo.GetByIdAsync(user.Id);
 
@@ -100,7 +100,7 @@ public class UserRepositoryTests
         using var context = CreateInMemoryContext();
         var repo = new UserRepository(context);
 
-        await repo.AddAsync(new User { Username = "exists", Email = "e@e.com", PasswordHash = "h" });
+        await repo.AddAsync(new User { Username = "exists", Email = "e@e.com", PasswordHash = "h" }, CancellationToken.None);
 
         Assert.True(await repo.UsernameExistsAsync("exists", CancellationToken.None));
         Assert.False(await repo.UsernameExistsAsync("nope", CancellationToken.None));
@@ -117,9 +117,9 @@ public class UserRepositoryTests
         using var context = CreateInMemoryContext();
         var repo = new UserRepository(context);
 
-        var u1 = await repo.AddAsync(new User { Username = "a", Email = "a@a.com", PasswordHash = "h" });
-        var u2 = await repo.AddAsync(new User { Username = "b", Email = "b@b.com", PasswordHash = "h" });
-        await repo.AddAsync(new User { Username = "c", Email = "c@c.com", PasswordHash = "h" });
+        var u1 = await repo.AddAsync(new User { Username = "a", Email = "a@a.com", PasswordHash = "h" }, CancellationToken.None);
+        var u2 = await repo.AddAsync(new User { Username = "b", Email = "b@b.com", PasswordHash = "h" }, CancellationToken.None);
+        await repo.AddAsync(new User { Username = "c", Email = "c@c.com", PasswordHash = "h" }, CancellationToken.None);
 
         var result = await repo.GetByIdsAsync([u1.Id, u2.Id], CancellationToken.None);
 

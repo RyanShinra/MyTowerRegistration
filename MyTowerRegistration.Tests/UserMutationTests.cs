@@ -50,7 +50,7 @@ public class UserMutationTests
             .ReturnsAsync(false);
         _mockRepo.Setup(r => r.EmailExistsAsync(It.IsAny<string>(), CancellationToken.None))
             .ReturnsAsync(false);
-        _mockRepo.Setup(r => r.AddAsync(It.IsAny<User>()))
+        _mockRepo.Setup(r => r.AddAsync(It.IsAny<User>(), CancellationToken.None))
             .ReturnsAsync((User u) => { u.Id = 1; return u; });
 
         var input = new RegisterUserInput("testuser", "test@example.com", "Password123");
@@ -65,7 +65,7 @@ public class UserMutationTests
         Assert.Equal("test@example.com", result.User.Email);
 
         // Verify the repository was called
-        _mockRepo.Verify(r => r.AddAsync(It.IsAny<User>()), Times.Once);
+        _mockRepo.Verify(r => r.AddAsync(It.IsAny<User>(), CancellationToken.None), Times.Once);
     }
 
     // -------------------------------------------------------------------------
@@ -95,7 +95,7 @@ public class UserMutationTests
         Assert.Equal(UserErrorCode.UsernameTaken, result.Errors![0].Code);
 
         // Verify AddAsync was NEVER called (we short-circuited)
-        _mockRepo.Verify(r => r.AddAsync(It.IsAny<User>()), Times.Never);
+        _mockRepo.Verify(r => r.AddAsync(It.IsAny<User>(), CancellationToken.None), Times.Never);
     }
 
     // -------------------------------------------------------------------------
@@ -154,7 +154,7 @@ public class UserMutationTests
             .ReturnsAsync(false);
 
         User? capturedUser = null;
-        _mockRepo.Setup(r => r.AddAsync(It.IsAny<User>()))
+        _mockRepo.Setup(r => r.AddAsync(It.IsAny<User>(), CancellationToken.None))
             .Callback<User>(u => capturedUser = u)  // Capture the entity
             .ReturnsAsync((User u) => u);
 

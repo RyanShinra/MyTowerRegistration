@@ -77,7 +77,7 @@ public class UserRepository : IUserRepository
     //          await _context.SaveChangesAsync(); ← executes it
     //          return user;                  ← Id is now populated by PostgreSQL
     //   - Note: .Add() is sync (just stages), SaveChangesAsync() is the async part
-    public async Task<User> AddAsync(User user)
+    public async Task<User> AddAsync(User user, CancellationToken ct)
     {
         _context.Users.Add(user);
         await _context.SaveChangesAsync();

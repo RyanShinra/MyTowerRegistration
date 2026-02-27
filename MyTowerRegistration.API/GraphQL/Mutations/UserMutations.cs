@@ -110,7 +110,7 @@ public class UserMutations
             CreatedAt = DateTime.UtcNow,
         };
 
-        User createdUser = await userRepository.AddAsync(newUser);
+        User createdUser = await userRepository.AddAsync(newUser, ct);
         return new RPayload(createdUser, null);
     }
 

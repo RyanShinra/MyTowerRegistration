@@ -41,7 +41,7 @@ public interface IUserRepository
 
     // TODO 4: Task<User> AddAsync(User user)
     //   - Inserts a new user and returns it (with the DB-generated Id populated)
-    Task<User> AddAsync(User user);
+    Task<User> AddAsync(User user, CancellationToken ct);
 
     // TODO 5: Task<bool> UsernameExistsAsync(string username)
     //   - Check for uniqueness before inserting (application-level validation)
