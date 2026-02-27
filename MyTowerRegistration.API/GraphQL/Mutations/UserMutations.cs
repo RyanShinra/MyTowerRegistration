@@ -100,8 +100,8 @@ public class UserMutations
             : null;
 
         if (ValidateEmail() is { } badEmailError) return badEmailError;
-        if (await ValidateAvailableEmail() is { } takenEmailError) return takenEmailError;
         if (await ValidateAvailableUsername() is { } takenUsernameError) return takenUsernameError;
+        if (await ValidateAvailableEmail() is { } takenEmailError) return takenEmailError;
 
         User newUser = new() {
             Username = input.Username,

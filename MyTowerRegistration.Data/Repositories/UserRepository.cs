@@ -19,7 +19,6 @@
 
 using Microsoft.EntityFrameworkCore;
 using MyTowerRegistration.Data.Models;
-using MyTowerRegistration.Data; //AppDbContext 
 
 namespace MyTowerRegistration.Data.Repositories;
 
