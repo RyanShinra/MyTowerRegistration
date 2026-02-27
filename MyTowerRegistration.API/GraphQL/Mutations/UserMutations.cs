@@ -34,7 +34,7 @@ namespace MyTowerRegistration.API.GraphQL.Mutations;
 /// GraphQL mutation resolvers for User operations.
 /// Each public method becomes a field on the Mutation type.
 /// </summary>
-//[MutationType]
+
 public class UserMutations
 {
     // TODO 1: Implement RegisterUser
