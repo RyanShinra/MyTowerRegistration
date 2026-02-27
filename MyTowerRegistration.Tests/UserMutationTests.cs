@@ -42,7 +42,7 @@ public class UserMutationTests
     // -------------------------------------------------------------------------
     // TODO: Implement this test
     //
-       [Fact]
+    [Fact]
     public async Task RegisterUser_WithValidInput_ReturnsUserAndNoErrors()
     {
         // Arrange — set up the mock to simulate "no conflicts"
@@ -73,7 +73,7 @@ public class UserMutationTests
     // -------------------------------------------------------------------------
     // TODO: Implement this test
     //
-       [Fact]
+    [Fact]
     public async Task RegisterUser_WithDuplicateUsername_ReturnsError()
     {
         // Arrange — username already exists
@@ -103,7 +103,7 @@ public class UserMutationTests
     // -------------------------------------------------------------------------
     // TODO: Implement this test
     //
-       [Fact]
+    [Fact]
     public async Task RegisterUser_WithDuplicateEmail_ReturnsError()
     {
         _mockRepo.Setup(r => r.UsernameExistsAsync(It.IsAny<string>(), CancellationToken.None))
@@ -145,7 +145,7 @@ public class UserMutationTests
     // -------------------------------------------------------------------------
     // TODO: Implement this test
     //
-       [Fact]
+    [Fact]
     public async Task RegisterUser_PasswordIsHashed_NotStoredPlaintext()
     {
         _mockRepo.Setup(r => r.UsernameExistsAsync(It.IsAny<string>(), CancellationToken.None))

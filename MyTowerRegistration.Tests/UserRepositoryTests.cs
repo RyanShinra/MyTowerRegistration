@@ -40,7 +40,7 @@ public class UserRepositoryTests
     // -------------------------------------------------------------------------
     // TODO: Implement
     //
-       [Fact]
+    [Fact]
     public async Task AddAsync_SavesUserAndAssignsId()
     {
         using var context = CreateInMemoryContext();
@@ -58,7 +58,7 @@ public class UserRepositoryTests
     // -------------------------------------------------------------------------
     // TODO: Implement
     //
-       [Fact]
+    [Fact]
     public async Task GetByIdAsync_ExistingUser_ReturnsUser()
     {
         using var context = CreateInMemoryContext();
@@ -78,7 +78,7 @@ public class UserRepositoryTests
     // -------------------------------------------------------------------------
     // TODO: Implement
     //
-       [Fact]
+    [Fact]
     public async Task GetByIdAsync_NonExistentUser_ReturnsNull()
     {
         using var context = CreateInMemoryContext();
@@ -94,7 +94,7 @@ public class UserRepositoryTests
     // -------------------------------------------------------------------------
     // TODO: Implement
     //
-       [Fact]
+    [Fact]
     public async Task UsernameExistsAsync_ExistingUsername_ReturnsTrue()
     {
         using var context = CreateInMemoryContext();
@@ -111,7 +111,7 @@ public class UserRepositoryTests
     // -------------------------------------------------------------------------
     // TODO: Implement
     //
-       [Fact]
+    [Fact]
     public async Task GetByIdsAsync_ReturnsMatchingUsers()
     {
         using var context = CreateInMemoryContext();
