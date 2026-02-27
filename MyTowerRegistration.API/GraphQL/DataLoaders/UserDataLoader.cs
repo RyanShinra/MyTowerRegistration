@@ -58,14 +58,6 @@ public class UserBatchDataLoader : BatchDataLoader<int, User>
         _repository = repository;
     }
 
-    //public UserBatchDataLoader(
-    //    IUserRepository repository, 
-    //    IBatchScheduler batchScheduler)
-    //    : this(repository, batchScheduler, new DataLoaderOptions()) 
-    //{ }
-
-
-
 
     // TODO 3: Override LoadBatchAsync:
     //   protected override async Task<IReadOnlyDictionary<int, User>> LoadBatchAsync(

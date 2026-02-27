@@ -70,7 +70,7 @@ public class UserRepository : IUserRepository
             .ToDictionaryAsync(keySelector: (User user) => {
                 // selects the field from `user` to be the key in the Dictionary
                 return user.Id;
-            }, ct); 
+            }, ct);
     }
 
     // TODO 6: Implement AddAsync(User user)
