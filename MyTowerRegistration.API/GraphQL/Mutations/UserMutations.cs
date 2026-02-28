@@ -87,6 +87,19 @@ public class UserMutations
 
         bool TryCreateEmail() => System.Net.Mail.MailAddress.TryCreate(input.Email, out _);
 
+        RPayload? ValidateUsername()
+        {
+            if (string.IsNullOrWhiteSpace(input.Username)) 
+                return ErrorPayload("Invalid Empty Username", UEC.InvalidUsername);
+
+            if (input.Username.Length < 3 || input.Username.Length > 20)
+                return ErrorPayload("Username must be between 3 and 20 characters", UEC.InvalidUsername);
+
+            return null; 
+        }
+            
+        
+
         RPayload? ValidateEmail() => !TryCreateEmail()
             ? ErrorPayload("Invalid e-mail address", UEC.InvalidEmail) 
             : null;
@@ -100,6 +113,7 @@ public class UserMutations
             : null;
 
         if (ValidateEmail() is { } badEmailError) return badEmailError;
+        if (ValidateUsername() is { } badUsernameError) return badUsernameError;
         if (await ValidateAvailableUsername() is { } takenUsernameError) return takenUsernameError;
         if (await ValidateAvailableEmail() is { } takenEmailError) return takenEmailError;
 
