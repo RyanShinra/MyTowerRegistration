@@ -51,9 +51,8 @@ public class UserBatchDataLoader : BatchDataLoader<int, User>
 
     public UserBatchDataLoader(
         IUserRepository repository, 
-        IBatchScheduler batchScheduler, 
-        DataLoaderOptions? options = null) 
-        : base(batchScheduler, options)
+        IBatchScheduler batchScheduler) 
+        : base(batchScheduler, new DataLoaderOptions())
     {
         _repository = repository;
     }
