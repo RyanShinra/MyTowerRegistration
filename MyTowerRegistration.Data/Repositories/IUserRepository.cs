@@ -25,12 +25,12 @@ public interface IUserRepository
     // TODO 1: Task<User?> GetByIdAsync(int id)
     //   - Returns null if not found (that's what the ? means)
     //   - Compare to: async getById(id: number): Promise<User | null>
-    Task<User?> GetByIdAsync(int id);
+    Task<User?> GetByIdAsync(int id, CancellationToken ct);
 
     // TODO 2: Task<IReadOnlyList<User>> GetAllAsync()
     //   - Returns all users; IReadOnlyList signals "you get a snapshot, don't modify it"
     //   - Compare to: async getAll(): Promise<readonly User[]>
-    Task<IReadOnlyList<User>> GetAllAsync();
+    Task<IReadOnlyList<User>> GetAllAsync(CancellationToken ct);
 
     // TODO 3: Task<IDictionary<int, User>> GetByIdsAsync(IReadOnlyList<int> ids, CancellationToken ct)
     //   - Batch-fetch by IDs — this powers the DataLoader (N+1 prevention)

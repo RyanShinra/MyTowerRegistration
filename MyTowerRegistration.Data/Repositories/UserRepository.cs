@@ -43,17 +43,17 @@ public class UserRepository : IUserRepository
     // TODO 3: Implement GetByIdAsync(int id)
     //   - Use: await _context.Users.FindAsync(id)
     //   - FindAsync checks the local cache first, then hits the DB if needed
-    public async Task<User?> GetByIdAsync(int id)
+    public async Task<User?> GetByIdAsync(int id, CancellationToken ct)
     {
-        return await _context.Users.FindAsync(id);
+        return await _context.Users.FindAsync(id, ct);
     }
 
     // TODO 4: Implement GetAllAsync()
     //   - Use: await _context.Users.ToListAsync()
     //   - For production, add pagination! This is fine for a demo.
-    public async Task<IReadOnlyList<User>> GetAllAsync()
+    public async Task<IReadOnlyList<User>> GetAllAsync(CancellationToken ct)
     {
-        return await _context.Users.ToListAsync();
+        return await _context.Users.ToListAsync(ct);
     }
 
     // TODO 5: Implement GetByIdsAsync(IReadOnlyList<int> ids, CancellationToken ct)
@@ -80,7 +80,7 @@ public class UserRepository : IUserRepository
     public async Task<User> AddAsync(User user, CancellationToken ct)
     {
         _context.Users.Add(user);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(ct);
         return user;
     }
 
