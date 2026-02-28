@@ -32,6 +32,7 @@ namespace MyTowerRegistration.API.GraphQL.Types;
 public enum UserErrorCode
 {
     InvalidEmail,
+    InvalidUsername,
     UsernameTaken,
     EmailTaken,
     InvalidPassword,
