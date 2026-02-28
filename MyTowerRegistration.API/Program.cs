@@ -25,12 +25,12 @@ using MyTowerRegistration.Data;
 using MyTowerRegistration.Data.Repositories;
 
 // TODO: Uncomment these once you've implemented the GraphQL classes:
-// using MyTowerRegistration.API.GraphQL.Queries;
-// using MyTowerRegistration.API.GraphQL.Mutations;
-// using MyTowerRegistration.API.GraphQL.Types;
-// using MyTowerRegistration.API.GraphQL.DataLoaders;
+using MyTowerRegistration.API.GraphQL.Queries;
+using MyTowerRegistration.API.GraphQL.Mutations;
+using MyTowerRegistration.API.GraphQL.Types;
+using MyTowerRegistration.API.GraphQL.DataLoaders;
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 // =============================================================================
 // SERVICE REGISTRATION (Dependency Injection Container)
@@ -50,6 +50,9 @@ var builder = WebApplication.CreateBuilder(args);
 //   Compare to Node.js:
 //     const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 //   But here it's managed by DI — you never manually create/dispose connections.
+builder.Services.AddDbContext<AppDbContext>((DbContextOptionsBuilder options) => {
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+});
 
 // --- Repository Layer -------------------------------------------------------
 // TODO 2: Register the UserRepository
@@ -70,6 +73,7 @@ var builder = WebApplication.CreateBuilder(args);
 //     Transient → new instance every time (like calling `new` each time)
 //     Scoped    → one instance per request (what we want for DB access)
 //     Singleton → one instance for the app's lifetime (for stateless services)
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 // --- Hot Chocolate GraphQL --------------------------------------------------
 // TODO 3: Register the GraphQL server
@@ -91,6 +95,13 @@ var builder = WebApplication.CreateBuilder(args);
 //   Hot Chocolate v15 NOTE: With [QueryType] and [MutationType] attributes
 //   on your classes, you can alternatively use .AddTypes() to auto-discover
 //   all annotated types. But explicit registration is clearer for learning.
+builder.Services
+    .AddGraphQLServer()
+    .AddQueryType<UserQueries>()
+    .AddMutationType<UserMutations>()
+    .AddType<UserType>()
+    .AddDataLoader<UserBatchDataLoader>();
+
 
 // Keep OpenAPI support from the template
 builder.Services.AddOpenApi();
@@ -123,5 +134,6 @@ app.UseHttpsRedirection();
 //
 //   Compare to Apollo: app.use('/graphql', expressMiddleware(server));
 //   Default path is /graphql. Customize with: app.MapGraphQL("/api/graphql");
+app.MapGraphQL("/api/graphql");
 
 app.Run();
