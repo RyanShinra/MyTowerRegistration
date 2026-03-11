@@ -130,10 +130,30 @@ dotnet test
    ```sql
    CREATE DATABASE mytower;
    ```
+   ## Local Development Setup
+
+  Create `MyTowerRegistration.API/appsettings.Development.json` (not committed — contains secrets):
+  ```json
+  {
+    "Logging": {
+      "LogLevel": {
+        "Default": "Information",
+        "Microsoft.AspNetCore": "Warning",
+        "HotChocolate": "Debug"
+      }
+    },
+    "ConnectionStrings": {
+      "DefaultConnection": "Host=localhost;Port=5432;Database=mytower;Username=postgres;Password=YOUR_PASSWORD"
+    }
+  }
+  ```
+
+  Also create `.env` in the repo root (see `.env.example` for required variables).
+
 4. **Update connection string** in `appsettings.json` and `appsettings.Development.json`:
-   ```json
-   "DefaultConnection": "Host=localhost;Port=5432;Database=mytower;Username=postgres;Password=YOUR_PASSWORD"
-   ```
+  ```json
+  "DefaultConnection": "Host=localhost;Port=5432;Database=mytower;Username=postgres;Password=YOUR_PASSWORD"
+  ```
 
 ## GraphQL Schema
 

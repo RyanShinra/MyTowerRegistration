@@ -364,3 +364,6 @@ FodyWeavers.xsd
 /MyTowerRegistration.API/appsettings.Development.json
 /.claude
 .DS_Store
+
+#Environment variables file, see .env.example for placeholder values. This file should not be checked in to source control as it may contain sensitive information.
+.env
