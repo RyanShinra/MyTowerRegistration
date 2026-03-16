@@ -4,15 +4,15 @@ WORKDIR /src
 
 # Copy solution and project files first (layer caching for restore)
 COPY MyTowerRegistration.sln .
-COPY MyTowerRegistration.API/MyTowerRegistration_API.csproj MyTowerRegistration.API/
-COPY MyTowerRegistration.Data/MyTowerRegistration_Data.csproj MyTowerRegistration.Data/
-COPY MyTowerRegistration.Tests/MyTowerRegistration_Tests.csproj MyTowerRegistration.Tests/
+COPY MyTowerRegistration.API/MyTowerRegistration.API.csproj MyTowerRegistration.API/
+COPY MyTowerRegistration.Data/MyTowerRegistration.Data.csproj MyTowerRegistration.Data/
+COPY MyTowerRegistration.Tests/MyTowerRegistration.Tests.csproj MyTowerRegistration.Tests/
 
 RUN dotnet restore
 
 # Copy everything else and build
 COPY . .
-RUN dotnet publish MyTowerRegistration.API/MyTowerRegistration_API.csproj \
+RUN dotnet publish MyTowerRegistration.API/MyTowerRegistration.API.csproj \
     -c Release -o /app/publish --no-restore
 
 # Runtime stage
