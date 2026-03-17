@@ -174,7 +174,7 @@ The easiest way to run the full stack (API + PostgreSQL + migrations) is with Do
    docker compose up --build
    ```
 
-3. Open the GraphQL playground: `http://localhost:8080/graphql`
+3. Open the GraphQL playground: `http://localhost:8080/api/graphql`
 
 ### How it works
 
@@ -198,8 +198,8 @@ Both are expected on a clean environment and can be safely ignored.
 ### Stopping
 
 ```bash
-docker compose down        # stop and remove containers
-docker compose down -v     # also wipe the database volume (clean slate)
+docker compose down        # stop and remove containers (data persists in named volume)
+docker compose down -v     # stop, remove containers, AND wipe the database volume (clean slate)
 ```
 
 ## GraphQL Schema

@@ -1,12 +1,12 @@
 services:
   api:
-    build:      
+    build:
       target: runtime
       context: .
     ports:
       - "8080:8080"
     environment:
-      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=mytower;Username=postgres;Password=${DB_PASSWORD}
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=mytower;Username=postgres;Password=${DB_PASSWORD:?DB_PASSWORD must be set}
     depends_on:
       db-migrations:
         condition: service_completed_successfully
@@ -16,9 +16,11 @@ services:
     environment:
       POSTGRES_DB: mytower
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
     ports:
       - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -28,8 +30,10 @@ services:
     build:
       context: .
       target: dbMigrations
-    command: ["Host=db;Port=5432;Database=mytower;Username=postgres;Password=${DB_PASSWORD}"]
+    command: ["Host=db;Port=5432;Database=mytower;Username=postgres;Password=${DB_PASSWORD:?DB_PASSWORD must be set}"]
     depends_on:
       db:
         condition: service_healthy
-    
+
+volumes:
+  db-data:

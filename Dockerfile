@@ -14,7 +14,7 @@ RUN dotnet restore
 COPY . .
 RUN dotnet publish MyTowerRegistration.API/MyTowerRegistration.API.csproj \
     -c Release -o /app/publish --no-restore
-RUN dotnet tool install --global dotnet-ef --version 10.0.* 
+RUN dotnet tool install --global dotnet-ef --version 10.0.0
 ENV PATH="$PATH:/root/.dotnet/tools"
 # Builds `migrate-db` which is used below 
 RUN dotnet ef migrations bundle \
