@@ -155,6 +155,53 @@ dotnet test
   "DefaultConnection": "Host=localhost;Port=5432;Database=mytower;Username=postgres;Password=YOUR_PASSWORD"
   ```
 
+## Running with Docker
+
+The easiest way to run the full stack (API + PostgreSQL + migrations) is with Docker Compose.
+
+### Prerequisites
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) with WSL 2 backend
+
+### Quick Start
+
+1. Copy `.env.example` to `.env` and set a database password:
+   ```
+   DB_PASSWORD=your_password_here
+   ```
+
+2. Start everything:
+   ```bash
+   docker compose up --build
+   ```
+
+3. Open the GraphQL playground: `http://localhost:8080/graphql`
+
+### How it works
+
+On startup, Docker Compose runs three services in order:
+
+| Service | What it does |
+|---|---|
+| `db` | Starts PostgreSQL, waits until healthy |
+| `db-migrations` | Runs EF Core migrations against the database, then exits |
+| `api` | Starts the API once migrations complete successfully |
+
+### Expected log noise
+
+On first run you will see these messages — they are **not errors**:
+
+- `Cannot load library libgssapi_krb5.so.2` — Npgsql probes for optional Kerberos support, doesn't find it, and continues normally
+- `relation "__EFMigrationsHistory" does not exist` — EF Core checks this table before creating it; on a fresh database it won't exist yet
+
+Both are expected on a clean environment and can be safely ignored.
+
+### Stopping
+
+```bash
+docker compose down        # stop and remove containers
+docker compose down -v     # also wipe the database volume (clean slate)
+```
+
 ## GraphQL Schema
 
 ```graphql
