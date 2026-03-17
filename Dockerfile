@@ -14,6 +14,22 @@ RUN dotnet restore
 COPY . .
 RUN dotnet publish MyTowerRegistration.API/MyTowerRegistration.API.csproj \
     -c Release -o /app/publish --no-restore
+RUN dotnet tool install --global dotnet-ef --version 10.0.* 
+ENV PATH="$PATH:/root/.dotnet/tools"
+# Builds `migrate-db` which is used below 
+RUN dotnet ef migrations bundle \
+    --project MyTowerRegistration.Data/MyTowerRegistration.Data.csproj \
+    --startup-project MyTowerRegistration.API/MyTowerRegistration.API.csproj \
+    --output /app/migrate-db \
+    --configuration Release
+
+# EF Migrations Bundle stage
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS dbMigrations
+RUN apt-get update && apt-get install -y --no-install-recommends libgssapi-krb5-2 && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+# The `migrate-db` tool is copied from the build stage and will be used to apply database migrations at runtime.
+COPY --from=build /app/migrate-db . 
+ENTRYPOINT [ "./migrate-db", "--connection" ]
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
