@@ -7,6 +7,7 @@ services:
       - "8080:8080"
     environment:
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=mytower;Username=postgres;Password=${DB_PASSWORD:?DB_PASSWORD must be set}
+      - ASPNETCORE_ENVIRONMENT=Development
     depends_on:
       db-migrations:
         condition: service_completed_successfully
@@ -30,6 +31,8 @@ services:
     build:
       context: .
       target: dbMigrations
+    environment:
+      - DOTNET_ENVIRONMENT=Production
     command: ["Host=db;Port=5432;Database=mytower;Username=postgres;Password=${DB_PASSWORD:?DB_PASSWORD must be set}"]
     depends_on:
       db:

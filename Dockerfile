@@ -30,7 +30,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS dbMigrations
 RUN apt-get update && apt-get install -y --no-install-recommends libgssapi-krb5-2 && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 # The `migrate-db` tool is copied from the build stage and will be used to apply database migrations at runtime.
-COPY --from=build /app/migrate-db . 
+COPY --from=build /app/migrate-db .
 ENTRYPOINT [ "./migrate-db", "--connection" ]
 
 # Runtime stage

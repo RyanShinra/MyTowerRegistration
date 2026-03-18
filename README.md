@@ -148,9 +148,7 @@ Create `MyTowerRegistration.API/appsettings.Development.json` (not committed —
 }
 ```
 
-Also create `.env` in the repo root (see `.env.example` for required variables).
-
-4. **Update connection string** in `appsettings.json` and `appsettings.Development.json`:
+1. **Update connection string** in `appsettings.json` and `appsettings.Development.json`:
   ```json
   "DefaultConnection": "Host=localhost;Port=5432;Database=mytower;Username=postgres;Password=YOUR_PASSWORD"
   ```
