@@ -106,7 +106,7 @@ dotnet ef database update --project MyTowerRegistration.Data --startup-project M
 dotnet run --project MyTowerRegistration.API
 
 # Open the Nitro GraphQL IDE in your browser:
-#   http://localhost:5026/graphql
+#   http://localhost:5026/api/graphql
 
 # Or use the .http file in Visual Studio:
 #   MyTowerRegistration.API/MyTowerRegistration.API.http

@@ -2,6 +2,10 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
+# Install dotnet-ef tool early — rarely changes, so this layer stays cached across source changes
+RUN dotnet tool install --global dotnet-ef --version 10.0.0
+ENV PATH="$PATH:/root/.dotnet/tools"
+
 # Copy solution and project files first (layer caching for restore)
 COPY MyTowerRegistration.sln .
 COPY MyTowerRegistration.API/MyTowerRegistration.API.csproj MyTowerRegistration.API/
@@ -14,8 +18,6 @@ RUN dotnet restore
 COPY . .
 RUN dotnet publish MyTowerRegistration.API/MyTowerRegistration.API.csproj \
     -c Release -o /app/publish --no-restore
-RUN dotnet tool install --global dotnet-ef --version 10.0.0
-ENV PATH="$PATH:/root/.dotnet/tools"
 # Builds `migrate-db` which is used below 
 RUN dotnet ef migrations bundle \
     --project MyTowerRegistration.Data/MyTowerRegistration.Data.csproj \
