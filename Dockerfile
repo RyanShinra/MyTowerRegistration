@@ -18,7 +18,7 @@ RUN dotnet restore
 COPY . .
 RUN dotnet publish MyTowerRegistration.API/MyTowerRegistration.API.csproj \
     -c Release -o /app/publish --no-restore
-# Builds `migrate-db` which is used below 
+# Builds `migrate-db` which is used below
 RUN dotnet ef migrations bundle \
     --project MyTowerRegistration.Data/MyTowerRegistration.Data.csproj \
     --startup-project MyTowerRegistration.API/MyTowerRegistration.API.csproj \

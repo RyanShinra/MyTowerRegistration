@@ -130,6 +130,7 @@ dotnet test
    ```sql
    CREATE DATABASE mytower;
    ```
+
 ## Local Development Setup
 
 Create `MyTowerRegistration.API/appsettings.Development.json` (not committed — contains secrets):
@@ -147,11 +148,6 @@ Create `MyTowerRegistration.API/appsettings.Development.json` (not committed —
   }
 }
 ```
-
-1. **Update connection string** in `appsettings.json` and `appsettings.Development.json`:
-  ```json
-  "DefaultConnection": "Host=localhost;Port=5432;Database=mytower;Username=postgres;Password=YOUR_PASSWORD"
-  ```
 
 ## Running with Docker
 
