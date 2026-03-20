@@ -106,7 +106,7 @@ dotnet ef database update --project MyTowerRegistration.Data --startup-project M
 dotnet run --project MyTowerRegistration.API
 
 # Open the Nitro GraphQL IDE in your browser:
-#   http://localhost:5026/graphql
+#   http://localhost:5026/api/graphql
 
 # Or use the .http file in Visual Studio:
 #   MyTowerRegistration.API/MyTowerRegistration.API.http
@@ -130,10 +130,71 @@ dotnet test
    ```sql
    CREATE DATABASE mytower;
    ```
-4. **Update connection string** in `appsettings.json` and `appsettings.Development.json`:
-   ```json
-   "DefaultConnection": "Host=localhost;Port=5432;Database=mytower;Username=postgres;Password=YOUR_PASSWORD"
+
+## Local Development Setup
+
+Create `MyTowerRegistration.API/appsettings.Development.json` (not committed — contains secrets):
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "HotChocolate": "Debug"
+    }
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5432;Database=mytower;Username=postgres;Password=YOUR_PASSWORD"
+  }
+}
+```
+
+## Running with Docker
+
+The easiest way to run the full stack (API + PostgreSQL + migrations) is with Docker Compose.
+
+### Prerequisites
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) with WSL 2 backend
+
+### Quick Start
+
+1. Copy `.env.example` to `.env` and set a database password:
    ```
+   DB_PASSWORD=your_password_here
+   ```
+
+2. Start everything:
+   ```bash
+   docker compose up --build
+   ```
+
+3. Open the GraphQL playground: `http://localhost:8080/api/graphql`
+
+### How it works
+
+On startup, Docker Compose runs three services in order:
+
+| Service | What it does |
+|---|---|
+| `db` | Starts PostgreSQL, waits until healthy |
+| `db-migrations` | Runs EF Core migrations against the database, then exits |
+| `api` | Starts the API once migrations complete successfully |
+
+### Expected log noise
+
+On first run you will see these messages — they are **not errors**:
+
+- `Cannot load library libgssapi_krb5.so.2` — Npgsql probes for optional Kerberos support, doesn't find it, and continues normally
+- `relation "__EFMigrationsHistory" does not exist` — EF Core checks this table before creating it; on a fresh database it won't exist yet
+
+Both are expected on a clean environment and can be safely ignored.
+
+### Stopping
+
+```bash
+docker compose down        # stop and remove containers (data persists in named volume)
+docker compose down -v     # stop, remove containers, AND wipe the database volume (clean slate)
+```
 
 ## GraphQL Schema
 
