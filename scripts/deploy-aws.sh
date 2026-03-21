@@ -9,6 +9,7 @@
 # PREREQUISITES:
 #   - AWS CLI installed and configured (aws configure)
 #   - Docker installed and running
+#   - jq installed (used for safe JSON construction)
 #   - Run from the repo root: ./scripts/deploy-aws.sh
 #
 # WHAT THIS SCRIPT DOES (in order):
@@ -42,6 +43,10 @@ set -euo pipefail
 AWS_REGION="us-east-2"
 AWS_ACCOUNT_ID="151935250464"
 
+# Set this so all AWS CLI calls default to the right region without needing --region on every command.
+# Commands that are truly global (e.g. IAM) ignore it; regional ones (ECR, ECS, RDS, etc.) use it.
+export AWS_DEFAULT_REGION="${AWS_REGION}"
+
 # ECR base URL: <account>.dkr.ecr.<region>.amazonaws.com
 # All images are pushed to and pulled from this registry.
 ECR_BASE="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
@@ -64,10 +69,6 @@ SUBNETS_ARRAY=(
     "subnet-0b71feaecab5f9d97"   # us-east-2b
     "subnet-0c2e0b3fdb97e61f4"   # us-east-2c
 )
-# Comma-separated for --network-configuration flags
-SUBNETS_CSV=$(IFS=,; echo "${SUBNETS_ARRAY[*]}")
-# Space-separated for --subnet-ids (RDS subnet group)
-SUBNETS_SPACE="${SUBNETS_ARRAY[*]}"
 
 # IAM role ECS uses to:
 #   - Pull images from ECR
@@ -165,13 +166,13 @@ aws ecr get-login-password --region "${AWS_REGION}" | \
     docker login --username AWS --password-stdin "${ECR_BASE}"
 
 echo "--- Building and pushing API image (runtime stage) ---"
-docker build --target runtime \
+docker build --platform linux/amd64 --target runtime \
     -t "${ECR_BASE}/${ECR_API_REPO}:latest" \
     .
 docker push "${ECR_BASE}/${ECR_API_REPO}:latest"
 
 echo "--- Building and pushing migrations image (dbMigrations stage) ---"
-docker build --target dbMigrations \
+docker build --platform linux/amd64 --target dbMigrations \
     -t "${ECR_BASE}/${ECR_MIGRATIONS_REPO}:latest" \
     .
 docker push "${ECR_BASE}/${ECR_MIGRATIONS_REPO}:latest"
@@ -199,11 +200,21 @@ echo ""
 
 # We store a placeholder now and update with the full connection string in step 8,
 # once we know the RDS endpoint. The secret ARN is captured for later use.
-SECRET_ARN=$(aws secretsmanager create-secret \
-    --name "${SECRET_NAME}" \
-    --description "DB connection string for MyTowerRegistration API" \
-    --secret-string "{\"connectionString\":\"placeholder\"}" \
-    --query 'ARN' --output text)
+# If the secret already exists (re-run), we reuse it rather than failing.
+if SECRET_ARN=$(aws secretsmanager describe-secret \
+    --secret-id "${SECRET_NAME}" \
+    --query 'ARN' --output text 2>/dev/null); then
+    echo "Secret already exists, reusing: ${SECRET_ARN}"
+    aws secretsmanager put-secret-value \
+        --secret-id "${SECRET_NAME}" \
+        --secret-string "{\"connectionString\":\"placeholder\"}" > /dev/null
+else
+    SECRET_ARN=$(aws secretsmanager create-secret \
+        --name "${SECRET_NAME}" \
+        --description "DB connection string for MyTowerRegistration API" \
+        --secret-string "{\"connectionString\":\"placeholder\"}" \
+        --query 'ARN' --output text)
+fi
 
 echo "Secret ARN: ${SECRET_ARN}"
 
@@ -220,18 +231,37 @@ echo "Secret ARN: ${SECRET_ARN}"
 echo ""
 echo "--- Step 5: Creating RDS security group ---"
 
-RDS_SG_ID=$(aws ec2 create-security-group \
-    --group-name "${RDS_SG_NAME}" \
-    --description "Allow Postgres from MyTowerRegistration ECS tasks only" \
-    --query 'GroupId' --output text)
+# Determine which VPC the ECS security group belongs to, so we create the
+# RDS security group in the same VPC rather than implicitly using the default.
+VPC_ID=$(aws ec2 describe-security-groups \
+    --group-ids "${ECS_SG_ID}" \
+    --query 'SecurityGroups[0].VpcId' \
+    --output text)
 
-aws ec2 authorize-security-group-ingress \
-    --group-id "${RDS_SG_ID}" \
-    --protocol tcp \
-    --port 5432 \
-    --source-group "${ECS_SG_ID}"
+# Reuse existing RDS security group if it already exists (idempotent re-run).
+EXISTING_RDS_SG=$(aws ec2 describe-security-groups \
+    --filters "Name=group-name,Values=${RDS_SG_NAME}" "Name=vpc-id,Values=${VPC_ID}" \
+    --query 'SecurityGroups[0].GroupId' \
+    --output text 2>/dev/null || echo "None")
 
-echo "RDS security group created: ${RDS_SG_ID}"
+if [ "${EXISTING_RDS_SG}" = "None" ] || [ -z "${EXISTING_RDS_SG}" ]; then
+    RDS_SG_ID=$(aws ec2 create-security-group \
+        --group-name "${RDS_SG_NAME}" \
+        --description "Allow Postgres from MyTowerRegistration ECS tasks only" \
+        --vpc-id "${VPC_ID}" \
+        --query 'GroupId' --output text)
+
+    aws ec2 authorize-security-group-ingress \
+        --group-id "${RDS_SG_ID}" \
+        --protocol tcp \
+        --port 5432 \
+        --source-group "${ECS_SG_ID}"
+
+    echo "RDS security group created: ${RDS_SG_ID}"
+else
+    RDS_SG_ID="${EXISTING_RDS_SG}"
+    echo "Reusing existing RDS security group: ${RDS_SG_ID}"
+fi
 
 # =============================================================================
 # STEP 6: Open port 8080 on the existing ECS security group
@@ -268,28 +298,41 @@ echo "OK"
 echo ""
 echo "--- Step 7: Creating RDS subnet group ---"
 
-aws rds create-db-subnet-group \
-    --db-subnet-group-name "${RDS_SUBNET_GROUP}" \
-    --db-subnet-group-description "Subnets for MyTowerRegistration RDS" \
-    --subnet-ids ${SUBNETS_SPACE}
+# Use array expansion to avoid word-splitting on subnet IDs with special chars.
+# Idempotent: skip creation if the subnet group already exists.
+if ! aws rds describe-db-subnet-groups \
+    --db-subnet-group-name "${RDS_SUBNET_GROUP}" > /dev/null 2>&1; then
+    aws rds create-db-subnet-group \
+        --db-subnet-group-name "${RDS_SUBNET_GROUP}" \
+        --db-subnet-group-description "Subnets for MyTowerRegistration RDS" \
+        --subnet-ids "${SUBNETS_ARRAY[@]}"
+else
+    echo "RDS subnet group '${RDS_SUBNET_GROUP}' already exists, skipping."
+fi
 
 echo "--- Creating RDS Postgres instance (this takes 5-10 minutes) ---"
 
-aws rds create-db-instance \
-    --db-instance-identifier "${RDS_INSTANCE_ID}" \
-    --db-instance-class db.t3.micro \
-    --engine postgres \
-    --engine-version 16 \
-    --master-username "${DB_USERNAME}" \
-    --master-user-password "${DB_PASSWORD}" \
-    --db-name "${DB_NAME}" \
-    --vpc-security-group-ids "${RDS_SG_ID}" \
-    --db-subnet-group-name "${RDS_SUBNET_GROUP}" \
-    --no-publicly-accessible \
-    --allocated-storage 20 \
-    --storage-type gp2 \
-    --no-multi-az \
-    --backup-retention-period 1 > /dev/null
+# Idempotent: skip creation if the instance already exists.
+if ! aws rds describe-db-instances \
+    --db-instance-identifier "${RDS_INSTANCE_ID}" > /dev/null 2>&1; then
+    aws rds create-db-instance \
+        --db-instance-identifier "${RDS_INSTANCE_ID}" \
+        --db-instance-class db.t3.micro \
+        --engine postgres \
+        --engine-version 16 \
+        --master-username "${DB_USERNAME}" \
+        --master-user-password "${DB_PASSWORD}" \
+        --db-name "${DB_NAME}" \
+        --vpc-security-group-ids "${RDS_SG_ID}" \
+        --db-subnet-group-name "${RDS_SUBNET_GROUP}" \
+        --no-publicly-accessible \
+        --allocated-storage 20 \
+        --storage-type gp2 \
+        --no-multi-az \
+        --backup-retention-period 1 > /dev/null
+else
+    echo "RDS instance '${RDS_INSTANCE_ID}' already exists, skipping creation."
+fi
 
 echo "Waiting for RDS to become available..."
 aws rds wait db-instance-available \
@@ -317,9 +360,13 @@ echo "--- Step 8: Updating secret with full connection string ---"
 
 CONNECTION_STRING="Host=${RDS_ENDPOINT};Port=5432;Database=${DB_NAME};Username=${DB_USERNAME};Password=${DB_PASSWORD}"
 
+# Use jq to build the JSON — direct string interpolation would break if the
+# password contains quotes, backslashes, or other special characters.
+SECRET_JSON=$(jq -n --arg cs "${CONNECTION_STRING}" '{connectionString:$cs}')
+
 aws secretsmanager update-secret \
     --secret-id "${SECRET_NAME}" \
-    --secret-string "{\"connectionString\":\"${CONNECTION_STRING}\"}"
+    --secret-string "${SECRET_JSON}"
 
 # Clear the password from memory — we no longer need it
 unset DB_PASSWORD
@@ -510,13 +557,30 @@ echo "OK"
 echo ""
 echo "--- Step 13: Creating ECS service ---"
 
-aws ecs create-service \
+# Idempotent: update the existing service's task definition if it already exists,
+# otherwise create it fresh. Both paths end with one running task.
+EXISTING_SERVICE=$(aws ecs describe-services \
     --cluster "${ECS_CLUSTER}" \
-    --service-name "${API_SERVICE_NAME}" \
-    --task-definition "${API_TASK_FAMILY}" \
-    --desired-count 1 \
-    --launch-type FARGATE \
-    --network-configuration "awsvpcConfiguration={subnets=[${SUBNETS_ARRAY[0]}],securityGroups=[${ECS_SG_ID}],assignPublicIp=ENABLED}" > /dev/null
+    --services "${API_SERVICE_NAME}" \
+    --query 'services[?status!=`INACTIVE`].serviceName' \
+    --output text 2>/dev/null || echo "")
+
+if [ -z "${EXISTING_SERVICE}" ]; then
+    aws ecs create-service \
+        --cluster "${ECS_CLUSTER}" \
+        --service-name "${API_SERVICE_NAME}" \
+        --task-definition "${API_TASK_FAMILY}" \
+        --desired-count 1 \
+        --launch-type FARGATE \
+        --network-configuration "awsvpcConfiguration={subnets=[${SUBNETS_ARRAY[0]}],securityGroups=[${ECS_SG_ID}],assignPublicIp=ENABLED}" > /dev/null
+else
+    echo "Service already exists, updating task definition..."
+    aws ecs update-service \
+        --cluster "${ECS_CLUSTER}" \
+        --service "${API_SERVICE_NAME}" \
+        --task-definition "${API_TASK_FAMILY}" \
+        --desired-count 1 > /dev/null
+fi
 
 echo "Waiting for service to reach steady state..."
 
