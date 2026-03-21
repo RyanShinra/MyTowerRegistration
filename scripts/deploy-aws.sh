@@ -89,7 +89,8 @@ API_SERVICE_NAME="mytower-registration-api"
 DB_NAME="mytower_registration"
 DB_USERNAME="postgres"
 
-# Port the .NET API listens on (matches Dockerfile EXPOSE and Program.cs MapGraphQL)
+# Port the .NET API listens on — must match Dockerfile EXPOSE and the default
+# Kestrel binding (http://+:8080) set by the aspnet base image.
 API_PORT=8080
 
 # CloudWatch log group — all container logs go here, prefixed by "api/" or "migrations/"
@@ -111,8 +112,12 @@ echo ""
 # The `Resource` ARN pattern uses a wildcard to cover the secret's random suffix.
 echo "--- Step 1: Granting Secrets Manager read access to ecsTaskExecutionRole ---"
 
+# Derive the role name from the ARN rather than hardcoding it, so this stays
+# correct if the role is renamed or the ARN variable is changed above.
+EXECUTION_ROLE_NAME="${EXECUTION_ROLE_ARN##*/}"
+
 aws iam put-role-policy \
-    --role-name ecsTaskExecutionRole \
+    --role-name "${EXECUTION_ROLE_NAME}" \
     --policy-name SecretsManagerReadForMyTowerRegistration \
     --policy-document "{
         \"Version\": \"2012-10-17\",
@@ -368,8 +373,11 @@ aws secretsmanager update-secret \
     --secret-id "${SECRET_NAME}" \
     --secret-string "${SECRET_JSON}"
 
-# Clear the password from memory — we no longer need it
+# Clear all sensitive values from memory — CONNECTION_STRING and SECRET_JSON
+# both contain the plaintext password, so unset them along with DB_PASSWORD.
 unset DB_PASSWORD
+unset CONNECTION_STRING
+unset SECRET_JSON
 
 echo "OK"
 
