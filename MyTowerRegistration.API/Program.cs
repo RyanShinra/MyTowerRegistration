@@ -121,7 +121,13 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+// Only redirect to HTTPS in environments where TLS is terminated by the app itself.
+// In ECS (and Docker Compose), TLS termination is handled externally (or not at all
+// for smoke testing), so redirecting would send clients to an unconfigured HTTPS port.
+if (app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 // TODO 4: Map the GraphQL endpoint
 //
