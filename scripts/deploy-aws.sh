@@ -195,7 +195,7 @@ echo "OK"
 echo ""
 echo "--- Step 4: Storing DB password in Secrets Manager ---"
 echo -n "Choose a password for the RDS Postgres database: "
-read -s DB_PASSWORD
+read -rs DB_PASSWORD
 echo ""
 
 # We store a placeholder now and update with the full connection string in step 8,
@@ -462,13 +462,24 @@ echo "OK"
 echo ""
 echo "--- Step 11: Running migrations ---"
 
-MIGRATION_TASK_ARN=$(aws ecs run-task \
+# Capture the full output so we can check the failures array.
+# run-task exits 0 even when it fails to place the task (e.g. image pull error,
+# capacity issue) — the failure details are in .failures, not the exit code.
+RUN_TASK_OUTPUT=$(aws ecs run-task \
     --cluster "${ECS_CLUSTER}" \
     --task-definition "${MIGRATIONS_TASK_FAMILY}" \
     --launch-type FARGATE \
     --network-configuration "awsvpcConfiguration={subnets=[${SUBNETS_ARRAY[0]}],securityGroups=[${ECS_SG_ID}],assignPublicIp=ENABLED}" \
-    --query 'tasks[0].taskArn' \
-    --output text)
+    --output json)
+
+MIGRATION_TASK_ARN=$(echo "${RUN_TASK_OUTPUT}" | jq -r '.tasks[0].taskArn // empty')
+FAILURES_LEN=$(echo "${RUN_TASK_OUTPUT}" | jq '.failures | length')
+
+if [ "${FAILURES_LEN}" -ne 0 ] || [ -z "${MIGRATION_TASK_ARN}" ]; then
+    echo "ERROR: Failed to start migration task."
+    echo "${RUN_TASK_OUTPUT}" | jq '.failures'
+    exit 1
+fi
 
 echo "Migration task: ${MIGRATION_TASK_ARN}"
 echo "Waiting for migrations to complete..."
