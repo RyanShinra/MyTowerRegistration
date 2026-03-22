@@ -47,6 +47,10 @@ AWS_ACCOUNT_ID="151935250464"
 # Commands that are truly global (e.g. IAM) ignore it; regional ones (ECR, ECS, RDS, etc.) use it.
 export AWS_DEFAULT_REGION="${AWS_REGION}"
 
+# Prevent Git Bash on Windows from converting leading slashes in arguments to Windows paths.
+# Without this, paths like /ecs/mytower-registration become C:/Program Files/Git/ecs/...
+export MSYS_NO_PATHCONV=1
+
 # ECR base URL: <account>.dkr.ecr.<region>.amazonaws.com
 # All images are pushed to and pulled from this registry.
 ECR_BASE="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
@@ -363,7 +367,13 @@ echo "RDS ready: ${RDS_ENDPOINT}"
 echo ""
 echo "--- Step 8: Updating secret with full connection string ---"
 
-CONNECTION_STRING="Host=${RDS_ENDPOINT};Port=5432;Database=${DB_NAME};Username=${DB_USERNAME};Password=${DB_PASSWORD}"
+# Trust Server Certificate=true skips RDS CA chain validation. Traffic is still
+# encrypted in transit, but the server certificate isn't verified against a
+# trusted CA — meaning a MITM inside the VPC could theoretically intercept it.
+# This is acceptable for a first deployment; the proper fix is to ship the AWS
+# RDS CA bundle in the container image and switch to SSL Mode=VerifyFull.
+# See: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html
+CONNECTION_STRING="Host=${RDS_ENDPOINT};Port=5432;Database=${DB_NAME};Username=${DB_USERNAME};Password=${DB_PASSWORD};SSL Mode=Require;Trust Server Certificate=true"
 
 # Use jq to build the JSON — direct string interpolation would break if the
 # password contains quotes, backslashes, or other special characters.
