@@ -367,6 +367,12 @@ echo "RDS ready: ${RDS_ENDPOINT}"
 echo ""
 echo "--- Step 8: Updating secret with full connection string ---"
 
+# Trust Server Certificate=true skips RDS CA chain validation. Traffic is still
+# encrypted in transit, but the server certificate isn't verified against a
+# trusted CA — meaning a MITM inside the VPC could theoretically intercept it.
+# This is acceptable for a first deployment; the proper fix is to ship the AWS
+# RDS CA bundle in the container image and switch to SSL Mode=VerifyFull.
+# See: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html
 CONNECTION_STRING="Host=${RDS_ENDPOINT};Port=5432;Database=${DB_NAME};Username=${DB_USERNAME};Password=${DB_PASSWORD};SSL Mode=Require;Trust Server Certificate=true"
 
 # Use jq to build the JSON — direct string interpolation would break if the
