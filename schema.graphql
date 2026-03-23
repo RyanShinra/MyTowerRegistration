@@ -23,7 +23,7 @@ type Mutation {
   registerUser(input: RegisterUserInput!): RegisterUserPayload!
 }
 
-"A registered user."
+"A registered user"
 type User {
   id: Int!
   username: String!
@@ -32,29 +32,22 @@ type User {
   # passwordHash is intentionally excluded from the schema (see UserType.cs)
 }
 
-"Input for the registerUser mutation."
 input RegisterUserInput {
   username: String!
   email: String!
   password: String!
 }
 
-"Result of the registerUser mutation. Either user or errors will be non-null."
 type RegisterUserPayload {
-  "The created user, or null if registration failed."
   user: User
-
-  "Validation errors, or null if registration succeeded."
   errors: [UserError!]
 }
 
-"A structured validation error returned in mutation payloads."
 type UserError {
   message: String!
   code: UserErrorCode!
 }
 
-"Error codes for user-related validation failures."
 enum UserErrorCode {
   INVALID_EMAIL
   INVALID_USERNAME
