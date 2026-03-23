@@ -1,0 +1,58 @@
+# GraphQL Schema — MyTowerRegistration
+#
+# This file is a human-readable reference snapshot of the API schema.
+# It is exported from the C# code-first schema (Hot Chocolate 15).
+#
+# The authoritative source of truth is the C# type definitions in:
+#   MyTowerRegistration.API/GraphQL/Types/
+#   MyTowerRegistration.API/GraphQL/Queries/
+#   MyTowerRegistration.API/GraphQL/Mutations/
+#
+# When the C# schema changes, update this file (or add a CI step to
+# regenerate it via Hot Chocolate's schema export).
+
+scalar DateTime
+
+type Query {
+  user(id: Int!): User
+
+  users: [User!]!
+}
+
+type Mutation {
+  registerUser(input: RegisterUserInput!): RegisterUserPayload!
+}
+
+"A registered user"
+type User {
+  id: Int!
+  username: String!
+  email: String!
+  createdAt: DateTime!
+  # passwordHash is intentionally excluded from the schema (see UserType.cs)
+}
+
+input RegisterUserInput {
+  username: String!
+  email: String!
+  password: String!
+}
+
+type RegisterUserPayload {
+  user: User
+  errors: [UserError!]
+}
+
+type UserError {
+  message: String!
+  code: UserErrorCode!
+}
+
+enum UserErrorCode {
+  INVALID_EMAIL
+  INVALID_USERNAME
+  USERNAME_TAKEN
+  EMAIL_TAKEN
+  INVALID_PASSWORD
+  USER_NOT_FOUND
+}
