@@ -190,8 +190,8 @@ Internet
     │  port 8080 (HTTP)
     ▼
 ECS Task (Fargate)
-├── Security Group: mytower-registration (sg-05354e42eaaf4662d)
-├── Public subnet (us-east-2a)
+├── Security Group: mytower-registration
+├── Public subnet (default VPC)
 ├── ECR image: mytower-registration-api:latest
 └── Secrets Manager → ConnectionStrings__DefaultConnection
     │
@@ -200,7 +200,7 @@ ECS Task (Fargate)
 RDS PostgreSQL 16 (db.t3.micro)
 ├── Security Group: mytower-registration-rds-sg
 │   └── Ingress: port 5432 from ECS security group only
-├── Subnet group: all 3 AZs (us-east-2a/b/c)
+├── Subnet group: all 3 AZs
 └── Credentials stored in Secrets Manager
 ```
 

@@ -14,8 +14,8 @@ Coming from a TypeScript/Python background, the goal was hands-on experience wit
 statically-typed, compiled .NET — specifically how dependency injection, async/await,
 and type-safe patterns differ from a dynamic language ecosystem.
 
-.NET 10 was chosen (rather than a stable LTS like .NET 8) to work with cutting-edge
-tooling and understand the current direction of the platform.
+.NET 10 was chosen over the then-current established LTS (.NET 8) to take advantage
+of newer platform features and tooling while still targeting an LTS release.
 
 ### Hot Chocolate (GraphQL)
 
@@ -37,7 +37,7 @@ Hot Chocolate 15 was chosen because:
 
 A deliberate choice was made to use **code-first** rather than schema-first SDL.
 
-| | Code-First | Schema-First |
+| Aspect | Code-First | Schema-First |
 |---|---|---|
 | Schema defined in | C# classes and attributes | `.graphql` SDL files |
 | Type safety | Compile-time | Runtime (SDL parsing) |
@@ -95,10 +95,10 @@ Each source file contains numbered TODO comments with detailed guidance.
 
 | Step | File | What was implemented |
 |------|------|----------------------|
-| 1 | `Data/Models/User.cs` | Entity: Id, Username, Email, PasswordHash, CreatedAt |
-| 2 | `Data/AppDbContext.cs` | DbContext with unique indexes on Username and Email |
-| 3 | `Data/Repositories/IUserRepository.cs` | Interface: 6 method signatures |
-| 4 | `Data/Repositories/UserRepository.cs` | EF Core LINQ implementation |
+| 1 | `MyTowerRegistration.Data/Models/User.cs` | Entity: Id, Username, Email, PasswordHash, CreatedAt |
+| 2 | `MyTowerRegistration.Data/AppDbContext.cs` | DbContext with unique indexes on Username and Email |
+| 3 | `MyTowerRegistration.Data/Repositories/IUserRepository.cs` | Interface: 6 method signatures |
+| 4 | `MyTowerRegistration.Data/Repositories/UserRepository.cs` | EF Core LINQ implementation |
 
 **Checkpoint:** `dotnet build MyTowerRegistration.Data`
 
@@ -106,24 +106,24 @@ Each source file contains numbered TODO comments with detailed guidance.
 
 | Step | File | What was implemented |
 |------|------|----------------------|
-| 5 | `API/GraphQL/Types/UserType.cs` | ObjectType descriptor — exposes fields, hides PasswordHash |
-| 6 | `API/GraphQL/Types/UserErrorType.cs` | UserError record + UserErrorCode enum |
-| 7 | `API/GraphQL/Types/RegisterUserInput.cs` | Input record (Username, Email, Password) |
-| 8 | `API/GraphQL/Types/RegisterUserPayload.cs` | Payload record (User?, Errors?) |
+| 5 | `MyTowerRegistration.API/GraphQL/Types/UserType.cs` | ObjectType descriptor — exposes fields, hides PasswordHash |
+| 6 | `MyTowerRegistration.API/GraphQL/Types/UserErrorType.cs` | UserError record + UserErrorCode enum |
+| 7 | `MyTowerRegistration.API/GraphQL/Types/RegisterUserInput.cs` | Input record (Username, Email, Password) |
+| 8 | `MyTowerRegistration.API/GraphQL/Types/RegisterUserPayload.cs` | Payload record (User?, Errors?) |
 
 ### Phase 3 — DataLoader and Resolvers
 
 | Step | File | What was implemented |
 |------|------|----------------------|
-| 9  | `API/GraphQL/DataLoaders/UserDataLoader.cs` | BatchDataLoader — LoadBatchAsync |
-| 10 | `API/GraphQL/Queries/UserQueries.cs` | GetUser (DataLoader), GetUsers (repository) |
-| 11 | `API/GraphQL/Mutations/UserMutations.cs` | RegisterUser — validate, hash, save, return payload |
+| 9  | `MyTowerRegistration.API/GraphQL/DataLoaders/UserDataLoader.cs` | BatchDataLoader — LoadBatchAsync |
+| 10 | `MyTowerRegistration.API/GraphQL/Queries/UserQueries.cs` | GetUser (DataLoader), GetUsers (repository) |
+| 11 | `MyTowerRegistration.API/GraphQL/Mutations/UserMutations.cs` | RegisterUser — validate, hash, save, return payload |
 
 ### Phase 4 — Wiring
 
 | Step | File | What was implemented |
 |------|------|----------------------|
-| 12 | `API/Program.cs` | AddDbContext, AddScoped, AddGraphQLServer, MapGraphQL |
+| 12 | `MyTowerRegistration.API/Program.cs` | AddDbContext, AddScoped, AddGraphQLServer, MapGraphQL |
 
 **Checkpoint:** `dotnet build` succeeds, `dotnet run` starts the server.
 
@@ -145,8 +145,8 @@ dotnet ef database update \
 
 | File | What to implement |
 |------|-------------------|
-| `Tests/UserMutationTests.cs` | 5 mutation tests with mocked repository |
-| `Tests/UserRepositoryTests.cs` | Repository tests using EF Core InMemory provider |
+| `MyTowerRegistration.Tests/UserMutationTests.cs` | 5 mutation tests with mocked repository |
+| `MyTowerRegistration.Tests/UserRepositoryTests.cs` | Repository tests using EF Core InMemory provider |
 
 ```bash
 dotnet test
