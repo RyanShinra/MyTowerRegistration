@@ -2,7 +2,7 @@
 ### GraphQL Test Requests — use Visual Studio's .http file support
 ### or REST Client extension in VS Code.
 ###
-### This app maps GraphQL to /api/api/graphql (see Program.cs: MapGraphQL("/api/api/graphql")).
+### This app maps GraphQL to /api/graphql (see Program.cs: MapGraphQL("/api/graphql")).
 ### All requests are POST with Content-Type: application/json.
 ### =============================================================================
 
