@@ -49,7 +49,7 @@ Intended as the player-facing registration and profile page at `io.mytower.dev`.
 
 ### Phase 4 — Python Game Frontend + Identity Linking
 
-The Python tower defence game already exists as a separate project. The next
+The Python tower game already exists as a separate project. The next
 step is linking player identity from the registration DB into the game so that:
 
 - Game progress is tied to a registered account
