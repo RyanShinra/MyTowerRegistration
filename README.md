@@ -9,7 +9,7 @@ A user registration GraphQL API built as a learning project to get hands-on with
 | Runtime       | .NET 10                                 |
 | GraphQL       | Hot Chocolate 15 (code-first)           |
 | ORM           | Entity Framework Core 10                |
-| Database      | PostgreSQL 18 (Npgsql provider)         |
+| Database      | PostgreSQL 18 (local) / 16 (AWS RDS) (Npgsql provider) |
 | Containerisation | Docker + Docker Compose              |
 | Hosting       | AWS ECS Fargate + RDS PostgreSQL        |
 | Testing       | xUnit + Moq + EF Core InMemory          |
@@ -38,8 +38,9 @@ MyTowerRegistration/
 ## Quick Start (Docker)
 
 ```bash
-# 1. Copy env file and set a password
+# 1. Copy env file and set your password
 cp .env.example .env
+# then edit .env and replace the placeholder: DB_PASSWORD=your_password_here
 
 # 2. Start the full stack (Postgres + migrations + API)
 docker compose up --build
