@@ -1,7 +1,104 @@
 # Deployment
 
-This document covers running the API locally with Docker Compose and deploying
-it to AWS ECS (Elastic Container Service) with RDS PostgreSQL.
+This document covers three ways to run the API:
+
+1. **[Visual Studio (bare metal)](#local-development-with-visual-studio)** — fastest for active development and debugging
+2. **[Docker Compose](#local-development-with-docker-compose)** — full stack locally, no Postgres installation required
+3. **[AWS ECS](#aws-ecs-deployment)** — production deployment on Fargate + RDS
+
+---
+
+## Local Development with Visual Studio
+
+The best option when you want to set a breakpoint, step through resolver logic, or iterate quickly without rebuilding Docker images.
+
+### Prerequisites
+
+1. **Visual Studio 2022** (or Rider) with the **ASP.NET and web development** workload
+2. **.NET 10 SDK** — [Download](https://dotnet.microsoft.com/download/dotnet/10.0)
+3. **PostgreSQL** running locally on port 5432
+   - Windows installer: [postgresql.org/download/windows](https://www.postgresql.org/download/windows/) (includes pgAdmin)
+   - Remember the `postgres` password you set during installation
+4. **EF Core CLI tools** (one-time install):
+   ```bash
+   dotnet tool install --global dotnet-ef
+   ```
+
+### First-Time Setup
+
+**1. Create the database**
+
+Open pgAdmin (or `psql`) and run:
+```sql
+CREATE DATABASE mytower;
+```
+
+**2. Create your local settings file**
+
+Create `MyTowerRegistration.API/appsettings.Development.json` — this file is git-ignored and holds your local secrets:
+
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "HotChocolate": "Debug"
+    }
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5432;Database=mytower;Username=postgres;Password=YOUR_PASSWORD"
+  }
+}
+```
+
+Replace `YOUR_PASSWORD` with the password you chose when installing Postgres.
+
+**3. Apply migrations**
+
+From the solution root:
+```bash
+dotnet ef database update \
+  --project MyTowerRegistration.Data \
+  --startup-project MyTowerRegistration.API
+```
+
+This creates the `Users` table and `__EFMigrationsHistory` in your local `mytower` database.
+
+### Running and Debugging
+
+**In Visual Studio:**
+
+1. Set `MyTowerRegistration.API` as the startup project (right-click → *Set as Startup Project*)
+2. Press **F5** to run with the debugger, or **Ctrl+F5** to run without
+3. ASP.NET Core will load `appsettings.Development.json` automatically because `ASPNETCORE_ENVIRONMENT=Development` is set in the default launch profile
+
+**Open the Nitro GraphQL playground:**
+```
+http://localhost:5026/api/graphql
+```
+
+> **Note:** Port 5026 is the local dev port (set in `launchSettings.json`).
+> Docker Compose uses port 8080. They're different environments — both are fine.
+
+**Alternatively, use the `.http` file** in Visual Studio:
+`MyTowerRegistration.API/MyTowerRegistration.API.http` has pre-written requests for the register mutation and user queries.
+
+### Adding a New Migration (after schema changes)
+
+When you change an EF Core entity (e.g. add a field to `User.cs`):
+
+```bash
+dotnet ef migrations add YourMigrationName \
+  --project MyTowerRegistration.Data \
+  --startup-project MyTowerRegistration.API
+
+dotnet ef database update \
+  --project MyTowerRegistration.Data \
+  --startup-project MyTowerRegistration.API
+```
+
+Commit the generated migration files alongside the code change.
 
 ---
 
