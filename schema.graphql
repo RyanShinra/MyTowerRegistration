@@ -1,0 +1,66 @@
+# GraphQL Schema — MyTowerRegistration
+#
+# This file is the human-readable source of truth for the API schema.
+# It is generated from C# code (code-first approach using Hot Chocolate 15).
+#
+# The authoritative source is the C# type definitions in:
+#   MyTowerRegistration.API/GraphQL/Types/
+#   MyTowerRegistration.API/GraphQL/Queries/
+#   MyTowerRegistration.API/GraphQL/Mutations/
+#
+# Keep this file in sync when the schema changes, or add a CI step to
+# regenerate it via Hot Chocolate's schema export.
+
+type Query {
+  "Returns a single user by ID. Uses DataLoader for batching."
+  user(id: Int!): User
+
+  "Returns all registered users."
+  users: [User!]!
+}
+
+type Mutation {
+  "Registers a new user. Returns the created user or a list of validation errors."
+  registerUser(input: RegisterUserInput!): RegisterUserPayload!
+}
+
+"A registered user account."
+type User {
+  id: Int!
+  username: String!
+  email: String!
+  createdAt: DateTime!
+  # passwordHash is intentionally excluded from the schema (see UserType.cs)
+}
+
+"Input for the registerUser mutation."
+input RegisterUserInput {
+  username: String!
+  email: String!
+  password: String!
+}
+
+"Result of the registerUser mutation. Either user or errors will be non-null."
+type RegisterUserPayload {
+  "The created user, or null if registration failed."
+  user: User
+
+  "Validation errors, or null if registration succeeded."
+  errors: [UserError!]
+}
+
+"A structured validation error returned in mutation payloads."
+type UserError {
+  message: String!
+  code: UserErrorCode!
+}
+
+"Error codes for user-related validation failures."
+enum UserErrorCode {
+  INVALID_EMAIL
+  INVALID_USERNAME
+  USERNAME_TAKEN
+  EMAIL_TAKEN
+  INVALID_PASSWORD
+  USER_NOT_FOUND
+}
