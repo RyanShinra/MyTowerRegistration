@@ -121,7 +121,23 @@ else
             }
 
             var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<UsersData>>();
-            users = result?.Data?.Users ?? new List<UserDto>();
+
+            // GraphQL always returns HTTP 200, even for errors — the error
+            // information lives in the response body, not the status code.
+            // A null result means the JSON didn't deserialise at all.
+            if (result is null)
+            {
+                errorMessage = "Failed to parse GraphQL response from API.";
+                return;
+            }
+
+            if (result.Errors is { Count: > 0 } topLevelErrors)
+            {
+                errorMessage = $"GraphQL error(s): {string.Join("; ", topLevelErrors.Select(e => e.Message))}";
+                return;
+            }
+
+            users = result.Data?.Users ?? new List<UserDto>();
         }
         catch (Exception ex)
         {

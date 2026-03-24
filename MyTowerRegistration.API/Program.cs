@@ -128,9 +128,20 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AdminPolicy", policy =>
     {
-        policy.WithOrigins(allowedOrigins)
-              .AllowAnyHeader()
-              .AllowAnyMethod();
+        if (allowedOrigins.Length > 0)
+        {
+            // Restrict to the configured origins — the right behaviour for any
+            // environment that has AllowedOrigins set in its appsettings.
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        }
+        // If AllowedOrigins is empty or missing (e.g. production before the
+        // Admin app is deployed), the policy simply allows nothing — no CORS
+        // headers are emitted, so browser-side cross-origin calls are blocked.
+        // This is the safe default: no frontend, no access.
+        // TODO Phase 5: populate AllowedOrigins in production appsettings once
+        // the Admin app has a stable URL (https://admin.mytower.dev).
     });
 });
 

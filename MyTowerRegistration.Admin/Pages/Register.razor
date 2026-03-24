@@ -19,6 +19,7 @@
 
 @page "/register"
 @inject HttpClient Http
+@* NavigationManager used to redirect to /users after successful registration *@
 @inject NavigationManager Nav
 
 <PageTitle>Register User — MyTower Admin</PageTitle>
@@ -143,18 +144,34 @@
             var result = await response.Content
                 .ReadFromJsonAsync<GraphQLResponse<RegisterData>>();
 
-            var payload = result?.Data?.RegisterUser;
+            // Check top-level GraphQL errors first (resolver exceptions, auth failures, etc.)
+            // These are distinct from the error-as-data payload errors checked below.
+            if (result is null)
+            {
+                errorMessage = "Failed to parse GraphQL response from API.";
+                return;
+            }
 
-            if (payload?.Errors is { Count: > 0 } errors)
+            if (result.Errors is { Count: > 0 } topLevelErrors)
+            {
+                errorMessage = $"GraphQL error(s): {string.Join("; ", topLevelErrors.Select(e => e.Message))}";
+                return;
+            }
+
+            var payload = result.Data?.RegisterUser;
+
+            if (payload?.Errors is { Count: > 0 } validationErrors)
             {
                 // The API returns validation errors as data (error-as-data pattern),
                 // not as HTTP errors. We surface them here.
-                errorMessage = string.Join(" | ", errors.Select(e => $"{e.Code}: {e.Message}"));
+                errorMessage = string.Join(" | ", validationErrors.Select(e => $"{e.Code}: {e.Message}"));
             }
             else if (payload?.User is not null)
             {
-                successMessage = $"Registered {payload.User.Username} successfully.";
-                formModel = new(); // Reset the form
+                // Navigate to the user list so the new user is immediately visible.
+                // NavigationManager.NavigateTo() is the Blazor equivalent of
+                // React Router's navigate() or Next.js's router.push().
+                Nav.NavigateTo("/users");
             }
         }
         catch (Exception ex)
