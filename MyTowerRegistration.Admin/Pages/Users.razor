@@ -31,8 +31,8 @@
 @if (isLoading)
 {
     @* Show a spinner while the GraphQL query is in flight.
-       This renders server-side in the HTML shell before WASM loads (if using SSR),
-       or immediately in WASM when the component first mounts. *@
+       In Blazor WASM, this renders client-side as soon as the component mounts
+       and OnInitializedAsync begins its await. *@
     <p><em>Loading...</em></p>
 }
 else if (errorMessage is not null)
@@ -122,8 +122,10 @@ else
 
             var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<UsersData>>();
 
-            // GraphQL always returns HTTP 200, even for errors — the error
-            // information lives in the response body, not the status code.
+            // GraphQL servers often return HTTP 200 even for application-level
+            // errors — those live in the response body's errors collection rather
+            // than solely in the HTTP status code. Non-2xx statuses are already
+            // caught by the IsSuccessStatusCode check above.
             // A null result means the JSON didn't deserialise at all.
             if (result is null)
             {
@@ -160,6 +162,5 @@ else
 
     private record UserDto(int Id, string Username, string Email, DateTime CreatedAt);
     private record UsersData(List<UserDto> Users);
-    private record GraphQLResponse<T>(T? Data, List<GraphQLError>? Errors);
-    private record GraphQLError(string Message);
+    // GraphQLResponse<T> and GraphQLError live in GraphQL/Models/GraphQLResponse.cs
 }

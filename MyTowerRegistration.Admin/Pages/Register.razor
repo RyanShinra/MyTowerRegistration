@@ -215,6 +215,5 @@
     private record UserError(string Message, string Code);
     private record RegisterPayload(UserResult? User, List<UserError>? Errors);
     private record RegisterData(RegisterPayload RegisterUser);
-    private record GraphQLResponse<T>(T? Data, List<GraphQLError>? Errors);
-    private record GraphQLError(string Message);
+    // GraphQLResponse<T> and GraphQLError live in GraphQL/Models/GraphQLResponse.cs
 }
