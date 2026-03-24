@@ -20,6 +20,7 @@
 //   4. Run                                          — app.Run()
 // =============================================================================
 
+using HotChocolate.Execution;
 using Microsoft.EntityFrameworkCore;
 using MyTowerRegistration.Data;
 using MyTowerRegistration.Data.Repositories;
@@ -111,6 +112,46 @@ builder.Services.AddOpenApi();
 // =============================================================================
 
 var app = builder.Build();
+
+// =============================================================================
+// SCHEMA EXPORT (AfterBuild hook — see ExportSchema target in .csproj)
+// =============================================================================
+//
+// When invoked with `--export-schema`, writes schema.graphql to the repo root
+// and exits immediately. Kestrel never starts, no port is opened, no DB is touched.
+//
+// Hot Chocolate builds the schema entirely from service registrations —
+// the HTTP pipeline is irrelevant for schema construction. This is why we can
+// return before the middleware section below ever runs.
+//
+// The MSBuild AfterBuild target calls this automatically on every Debug build,
+// so schema.graphql always reflects the current C# types. StrawberryShake
+// (in the Admin project) reads schema.graphql at its own build time to
+// generate strongly-typed C# client classes.
+if (args.Contains("--export-schema"))
+{
+    IRequestExecutorResolver executorResolver =
+        app.Services.GetRequiredService<IRequestExecutorResolver>();
+    IRequestExecutor executor = await executorResolver.GetRequestExecutorAsync();
+
+    string header = """
+        # GraphQL Schema — MyTowerRegistration (auto-generated — DO NOT EDIT)
+        # Regenerated on every Debug build via the ExportSchema MSBuild target.
+        # Schema is defined by the C# classes in MyTowerRegistration.API/GraphQL/
+        #
+        # To regenerate manually:
+        #   dotnet run --project MyTowerRegistration.API -- --export-schema
+
+        """;
+
+    string schemaPath = System.IO.Path.GetFullPath(
+        System.IO.Path.Combine(Directory.GetCurrentDirectory(), "..", "schema.graphql"));
+
+    Console.WriteLine($"[ExportSchema] Building schema from registered C# types...");
+    await File.WriteAllTextAsync(schemaPath, header + executor.Schema.ToString());
+    Console.WriteLine($"[ExportSchema] Written to: {schemaPath}");
+    return;
+}
 
 // =============================================================================
 // MIDDLEWARE PIPELINE (order matters — requests flow top to bottom)

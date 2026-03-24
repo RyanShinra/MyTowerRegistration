@@ -1,26 +1,17 @@
-# GraphQL Schema — MyTowerRegistration
+# GraphQL Schema — MyTowerRegistration (auto-generated — DO NOT EDIT)
+# Regenerated on every Debug build via the ExportSchema MSBuild target.
+# Source of truth: C# type definitions in MyTowerRegistration.API/GraphQL/
 #
-# This file is a human-readable reference snapshot of the API schema.
-# It is exported from the C# code-first schema (Hot Chocolate 15).
-#
-# The authoritative source of truth is the C# type definitions in:
-#   MyTowerRegistration.API/GraphQL/Types/
-#   MyTowerRegistration.API/GraphQL/Queries/
-#   MyTowerRegistration.API/GraphQL/Mutations/
-#
-# When the C# schema changes, update this file (or add a CI step to
-# regenerate it via Hot Chocolate's schema export).
-
-scalar DateTime
-
-type Query {
-  user(id: Int!): User
-
-  users: [User!]!
+# To regenerate manually:
+#   dotnet run --project MyTowerRegistration.API -- --export-schema
+schema {
+  query: UserQueries
+  mutation: UserMutations
 }
 
-type Mutation {
-  registerUser(input: RegisterUserInput!): RegisterUserPayload!
+type RegisterUserPayload {
+  user: User
+  errors: [UserError!]
 }
 
 "A registered user"
@@ -29,23 +20,26 @@ type User {
   username: String!
   email: String!
   createdAt: DateTime!
-  # passwordHash is intentionally excluded from the schema (see UserType.cs)
+}
+
+type UserError {
+  message: String!
+  code: UserErrorCode!
+}
+
+type UserMutations {
+  registerUser(input: RegisterUserInput!): RegisterUserPayload! @cost(weight: "10")
+}
+
+type UserQueries {
+  user(id: Int!): User @cost(weight: "10")
+  users: [User!]! @cost(weight: "10")
 }
 
 input RegisterUserInput {
   username: String!
   email: String!
   password: String!
-}
-
-type RegisterUserPayload {
-  user: User
-  errors: [UserError!]
-}
-
-type UserError {
-  message: String!
-  code: UserErrorCode!
 }
 
 enum UserErrorCode {
@@ -56,3 +50,12 @@ enum UserErrorCode {
   INVALID_PASSWORD
   USER_NOT_FOUND
 }
+
+"The purpose of the `cost` directive is to define a `weight` for GraphQL types, fields, and arguments. Static analysis can use these weights when calculating the overall cost of a query or response."
+directive @cost("The `weight` argument defines what value to add to the overall cost for every appearance, or possible appearance, of a type, field, argument, etc." weight: String!) on SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | ENUM | INPUT_FIELD_DEFINITION
+
+"The `@specifiedBy` directive is used within the type system definition language to provide a URL for specifying the behavior of custom scalar definitions."
+directive @specifiedBy("The specifiedBy URL points to a human-readable specification. This field will only read a result for scalar types." url: String!) on SCALAR
+
+"The `DateTime` scalar represents an ISO-8601 compliant date time type."
+scalar DateTime @specifiedBy(url: "https:\/\/www.graphql-scalars.com\/date-time")

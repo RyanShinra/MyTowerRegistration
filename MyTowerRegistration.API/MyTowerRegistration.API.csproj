@@ -27,4 +27,15 @@
     <ProjectReference Include="..\MyTowerRegistration.Data\MyTowerRegistration.Data.csproj" />
   </ItemGroup>
 
+  <!--
+    After every Debug build, run the compiled DLL with the schema export flag.
+    This overwrites schema.graphql at the repo root with a fresh SDL export.
+    Skipped for Release builds (Docker, CI) where no schema file is needed.
+  -->
+  <Target Name="ExportSchema" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">
+    <Message Text="[ExportSchema] Regenerating schema.graphql..." Importance="normal" />
+    <Exec Command="dotnet &quot;$(TargetPath)&quot; --export-schema"
+          WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
 </Project>
