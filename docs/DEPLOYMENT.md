@@ -19,7 +19,7 @@ The best option when you want to set a breakpoint, step through resolver logic, 
 3. **PostgreSQL** running locally on port 5432
    - Windows installer: [postgresql.org/download/windows](https://www.postgresql.org/download/windows/) (includes pgAdmin)
    - Remember the `postgres` password you set during installation
-4. **CLI tools** — restored from `dotnet-tools.json` (see First-Time Setup step 1).
+4. **CLI tools** — restored from `dotnet-tools.json` (see First-Time Setup step 0).
    If you prefer a global install instead:
    ```bash
    dotnet tool install --global dotnet-ef --version 10.0.0
@@ -99,7 +99,7 @@ http://localhost:5026/api/graphql
 1. Right-click the **Solution** → **Properties** → **Common Properties → Configure Startup Projects**
 2. Select **Multiple startup projects**
 3. Set both `MyTowerRegistration.API` and `MyTowerRegistration.Admin` to **Start**
-4. While there, go to **Project Build Dependencies** and tick `MyTowerRegistration.API` as a dependency of `MyTowerRegistration.Admin` — this ensures the schema export runs before the Admin project builds
+4. The solution already has `MyTowerRegistration.API` configured as a build dependency of `MyTowerRegistration.Admin` (so the schema export always runs first). You can verify this under **Project Build Dependencies** if needed.
 5. Press **F5** — both projects launch, two browser tabs open:
    - API Nitro playground: `http://localhost:5026/api/graphql`
    - Admin app: `http://localhost:5273`
