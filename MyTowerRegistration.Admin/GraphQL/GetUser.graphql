@@ -1,0 +1,17 @@
+# GetUser — fetch a single user by ID.
+#
+# The $id variable is declared with its type (Int!) matching the schema.
+# StrawberryShake generates GetUserAsync(int id) — the variable becomes
+# a typed C# method parameter. No string interpolation, no injection risk.
+#
+# The nullable return type (user: User — no !) means this field returns
+# null if the user doesn't exist. SS generates User? in C# for this field.
+
+query GetUser($id: Int!) {
+  user(id: $id) {
+    id
+    username
+    email
+    createdAt
+  }
+}

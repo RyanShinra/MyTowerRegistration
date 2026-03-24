@@ -1,0 +1,22 @@
+# GetUsers — fetch all registered users for the user list page.
+#
+# StrawberryShake reads this file at build time and generates:
+#   - IGetUsersResult interface
+#   - GetUsersResult concrete class
+#   - IMyTowerClient.GetUsersAsync() method
+#
+# The field selection here defines exactly what data comes back.
+# Fields on User that are NOT listed here are not fetched — this is
+# GraphQL's key advantage over REST: no over-fetching.
+#
+# passwordHash is not in the schema at all (excluded in UserType.cs),
+# so there's no risk of accidentally requesting it.
+
+query GetUsers {
+  users {
+    id
+    username
+    email
+    createdAt
+  }
+}

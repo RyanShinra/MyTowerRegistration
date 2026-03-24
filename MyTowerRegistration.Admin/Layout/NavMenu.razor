@@ -1,0 +1,67 @@
+@* =============================================================================
+   NAVMENU.RAZOR — Sidebar Navigation
+
+   This component manages its own collapsed/expanded state via a private bool
+   in the @code block. The parent layout doesn't need to know or care —
+   state that only affects one component lives in that component.
+
+   NavLink vs plain <a>:
+     NavLink is Blazor's router-aware anchor tag. It automatically adds the
+     CSS class "active" when the current URL matches its href. This is how
+     the highlighted nav item works without any manual JavaScript.
+
+     Match="NavLinkMatch.All" means the URL must match EXACTLY. Without it,
+     href="" (Home) would match every URL since every URL starts with "/".
+     All other NavLinks use the default partial match, which is fine since
+     their paths are unique prefixes.
+
+   Compare to React Router's <NavLink> — same concept, same name, same behavior.
+   ============================================================================= *@
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">MyTower Admin</a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
+    <nav class="nav flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="users">
+                <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span> Users
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="register">
+                <span class="bi bi-person-plus-fill-nav-menu" aria-hidden="true"></span> Register User
+            </NavLink>
+        </div>
+    </nav>
+</div>
+
+@code {
+    // Private state — only this component reads or modifies it.
+    // Blazor re-renders this component automatically when collapseNavMenu changes
+    // because it's referenced in the template via NavMenuCssClass below.
+    private bool collapseNavMenu = true;
+
+    // Computed property: returns the CSS class string based on state.
+    // This is the Blazor idiom for conditional CSS — no string interpolation needed.
+    // Compare to React: className={collapseNavMenu ? "collapse" : undefined}
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+        // No StateHasChanged() needed here — Blazor automatically re-renders
+        // after any DOM event handler (@onclick, @onchange, etc.) completes.
+    }
+}
