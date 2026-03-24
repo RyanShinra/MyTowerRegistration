@@ -31,9 +31,11 @@ The best option when you want to set a breakpoint, step through resolver logic, 
 
 From the solution root (once per machine, or after a fresh clone):
 ```bash
-dotnet tool restore
+dotnet tool restore --tool-manifest dotnet-tools.json
 ```
 This installs `dotnet-ef` and any other tools listed in `dotnet-tools.json`.
+The `--tool-manifest` flag is needed because the manifest lives at the repo root
+rather than the standard `.config/dotnet-tools.json` location.
 Unlike NuGet packages, CLI tools are not restored automatically by `dotnet build`.
 
 **1. Create the database**
