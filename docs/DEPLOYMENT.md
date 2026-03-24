@@ -19,12 +19,22 @@ The best option when you want to set a breakpoint, step through resolver logic, 
 3. **PostgreSQL** running locally on port 5432
    - Windows installer: [postgresql.org/download/windows](https://www.postgresql.org/download/windows/) (includes pgAdmin)
    - Remember the `postgres` password you set during installation
-4. **EF Core CLI tools** (one-time install):
+4. **CLI tools** — restored from `dotnet-tools.json` (see First-Time Setup step 1).
+   If you prefer a global install instead:
    ```bash
-   dotnet tool install --global dotnet-ef
+   dotnet tool install --global dotnet-ef --version 10.0.0
    ```
 
 ### First-Time Setup
+
+**0. Restore CLI tools**
+
+From the solution root (once per machine, or after a fresh clone):
+```bash
+dotnet tool restore
+```
+This installs `dotnet-ef` and any other tools listed in `dotnet-tools.json`.
+Unlike NuGet packages, CLI tools are not restored automatically by `dotnet build`.
 
 **1. Create the database**
 
@@ -67,11 +77,11 @@ This creates the `Users` table and `__EFMigrationsHistory` in your local `mytowe
 
 ### Running and Debugging
 
-**In Visual Studio:**
+**In Visual Studio (API only):**
 
 1. Set `MyTowerRegistration.API` as the startup project (right-click → *Set as Startup Project*)
 2. Press **F5** to run with the debugger, or **Ctrl+F5** to run without
-3. ASP.NET Core will load `appsettings.Development.json` automatically because `ASPNETCORE_ENVIRONMENT=Development` is set in the default launch profile
+3. ASP.NET Core loads `appsettings.Development.json` automatically because `ASPNETCORE_ENVIRONMENT=Development` is set in the default launch profile
 
 **Open the Nitro GraphQL playground:**
 ```
@@ -83,6 +93,16 @@ http://localhost:5026/api/graphql
 
 **Alternatively, use the `.http` file** in Visual Studio:
 `MyTowerRegistration.API/MyTowerRegistration.API.http` has pre-written requests for the register mutation and user queries.
+
+**Running API + Admin together:**
+
+1. Right-click the **Solution** → **Properties** → **Common Properties → Configure Startup Projects**
+2. Select **Multiple startup projects**
+3. Set both `MyTowerRegistration.API` and `MyTowerRegistration.Admin` to **Start**
+4. While there, go to **Project Build Dependencies** and tick `MyTowerRegistration.API` as a dependency of `MyTowerRegistration.Admin` — this ensures the schema export runs before the Admin project builds
+5. Press **F5** — both projects launch, two browser tabs open:
+   - API Nitro playground: `http://localhost:5026/api/graphql`
+   - Admin app: `http://localhost:5273`
 
 ### Adding a New Migration (after schema changes)
 
