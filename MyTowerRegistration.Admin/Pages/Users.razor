@@ -109,7 +109,7 @@ else
             //   users = result.Users.Select(u => new UserDto(u.Id, u.Username, u.Email, u.CreatedAt)).ToList();
 
             // Temporary: raw GraphQL POST until SS is wired up
-            var response = await Http.PostAsJsonAsync("api/graphql", new
+            using var response = await Http.PostAsJsonAsync("api/graphql", new
             {
                 query = "{ users { id username email createdAt } }"
             });
