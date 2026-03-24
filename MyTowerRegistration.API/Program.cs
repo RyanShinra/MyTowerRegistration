@@ -20,6 +20,7 @@
 //   4. Run                                          — app.Run()
 // =============================================================================
 
+using HotChocolate.Execution;
 using Microsoft.EntityFrameworkCore;
 using MyTowerRegistration.Data;
 using MyTowerRegistration.Data.Repositories;
@@ -103,6 +104,47 @@ builder.Services
     .AddDataLoader<UserBatchDataLoader>();
 
 
+// --- CORS ------------------------------------------------------------------
+// CORS (Cross-Origin Resource Sharing) is a browser security mechanism.
+// When the Blazor Admin app (localhost:5273) calls this API (localhost:5026),
+// the browser considers it a cross-origin request and blocks it by default.
+// We opt in by declaring exactly which origins are allowed.
+//
+// The allowed origins come from configuration (appsettings.Development.json
+// in dev, appsettings.json in prod) so they can differ per environment
+// without code changes. In production this will be https://admin.mytower.dev.
+//
+// AllowAnyHeader / AllowAnyMethod: GraphQL uses Content-Type: application/json
+// and POST — these are standard, so permitting all headers/methods is fine here.
+// For a public API you'd be more restrictive.
+//
+// IMPORTANT: UseCors() must be called BEFORE MapGraphQL() in the middleware
+// pipeline. Middleware order is significant — requests flow top to bottom.
+string[] allowedOrigins = builder.Configuration
+    .GetSection("AllowedOrigins")
+    .Get<string[]>() ?? [];
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AdminPolicy", policy =>
+    {
+        if (allowedOrigins.Length > 0)
+        {
+            // Restrict to the configured origins — the right behaviour for any
+            // environment that has AllowedOrigins set in its appsettings.
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        }
+        // If AllowedOrigins is empty or missing (e.g. production before the
+        // Admin app is deployed), the policy simply allows nothing — no CORS
+        // headers are emitted, so browser-side cross-origin calls are blocked.
+        // This is the safe default: no frontend, no access.
+        // TODO Phase 5: populate AllowedOrigins in production appsettings once
+        // the Admin app has a stable URL (https://admin.mytower.dev).
+    });
+});
+
 // Keep OpenAPI support from the template
 builder.Services.AddOpenApi();
 
@@ -111,6 +153,46 @@ builder.Services.AddOpenApi();
 // =============================================================================
 
 var app = builder.Build();
+
+// =============================================================================
+// SCHEMA EXPORT (AfterBuild hook — see ExportSchema target in .csproj)
+// =============================================================================
+//
+// When invoked with `--export-schema`, writes schema.graphql to the repo root
+// and exits immediately. Kestrel never starts, no port is opened, no DB is touched.
+//
+// Hot Chocolate builds the schema entirely from service registrations —
+// the HTTP pipeline is irrelevant for schema construction. This is why we can
+// return before the middleware section below ever runs.
+//
+// The MSBuild AfterBuild target calls this automatically on every Debug build,
+// so schema.graphql always reflects the current C# types. StrawberryShake
+// (in the Admin project) reads schema.graphql at its own build time to
+// generate strongly-typed C# client classes.
+if (args.Contains("--export-schema"))
+{
+    IRequestExecutorResolver executorResolver =
+        app.Services.GetRequiredService<IRequestExecutorResolver>();
+    IRequestExecutor executor = await executorResolver.GetRequestExecutorAsync();
+
+    string header = """
+        # GraphQL Schema — MyTowerRegistration (auto-generated — DO NOT EDIT)
+        # Regenerated on every Debug build via the ExportSchema MSBuild target.
+        # Schema is defined by the C# classes in MyTowerRegistration.API/GraphQL/
+        #
+        # To regenerate manually:
+        #   dotnet run --project MyTowerRegistration.API -- --export-schema
+
+        """;
+
+    string schemaPath = System.IO.Path.GetFullPath(
+        System.IO.Path.Combine(Directory.GetCurrentDirectory(), "..", "schema.graphql"));
+
+    Console.WriteLine($"[ExportSchema] Building schema from registered C# types...");
+    await File.WriteAllTextAsync(schemaPath, header + executor.Schema.ToString());
+    Console.WriteLine($"[ExportSchema] Written to: {schemaPath}");
+    return;
+}
 
 // =============================================================================
 // MIDDLEWARE PIPELINE (order matters — requests flow top to bottom)
@@ -140,6 +222,11 @@ if (app.Environment.IsDevelopment())
 //
 //   Compare to Apollo: app.use('/graphql', expressMiddleware(server));
 //   Default path is /graphql. Customize with: app.MapGraphQL("/api/graphql");
+
+// Apply the CORS policy before mapping endpoints. The browser sends a preflight
+// OPTIONS request before the real POST — UseCors handles that response.
+app.UseCors("AdminPolicy");
+
 app.MapGraphQL("/api/graphql");
 
 app.Run();

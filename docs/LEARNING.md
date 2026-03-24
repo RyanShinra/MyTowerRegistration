@@ -44,7 +44,7 @@ A deliberate choice was made to use **code-first** rather than schema-first SDL.
 | Refactoring | IDE rename support | Manual SDL + resolver sync |
 | Entry point | C# → schema generated | SDL → resolvers written to match |
 
-For a C# project, code-first means the type system is the single source of truth.
+For a C# project, code-first means the schema is defined entirely by the C# type system.
 Breaking schema changes are compiler errors, not runtime surprises.
 
 ### Entity Framework Core (over Dapper or raw ADO.NET)

@@ -1,0 +1,166 @@
+@* =============================================================================
+   USERS.RAZOR — User List Page
+
+   This page will display all registered users fetched via GraphQL.
+
+   IMPLEMENT FIRST — Wire up the GetUsers query using StrawberryShake.
+
+   The flow once StrawberryShake is set up:
+     1. OnInitializedAsync fires when the component first loads
+     2. It calls the generated MyTowerClient.GetUsersAsync()
+     3. SS sends POST /api/graphql with the GetUsers query
+     4. Results come back as strongly-typed C# objects (IGetUsersResult)
+     5. StateHasChanged() triggers re-render with the data
+     6. The @foreach loop renders a row for each user
+
+   The loading/error/data pattern below is the standard Blazor async data
+   fetching idiom. Compare to React's useState + useEffect pattern,
+   or SvelteKit's load() function.
+   ============================================================================= *@
+
+@page "/users"
+@inject HttpClient Http
+
+<PageTitle>Users — MyTower Admin</PageTitle>
+
+<h1>Users</h1>
+
+@* TODO: Replace HttpClient with StrawberryShake typed client:
+   @inject IMyTowerClient Client *@
+
+@if (isLoading)
+{
+    @* Show a spinner while the GraphQL query is in flight.
+       In Blazor WASM, this renders client-side as soon as the component mounts
+       and OnInitializedAsync begins its await. *@
+    <p><em>Loading...</em></p>
+}
+else if (errorMessage is not null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Registered</th>
+            </tr>
+        </thead>
+        <tbody>
+            @* @foreach in a template is C# — the @ prefix signals to Razor
+               that what follows is C# code, not HTML markup. *@
+            @foreach (var user in users)
+            {
+                <tr>
+                    <td>@user.Id</td>
+                    <td>@user.Username</td>
+                    <td>@user.Email</td>
+                    <td>@user.CreatedAt.ToString("yyyy-MM-dd")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    // =============================================================================
+    // COMPONENT STATE
+    //
+    // Fields declared in @code are private to this component instance.
+    // When any of these fields change and the component re-renders, Blazor
+    // efficiently diffs the virtual DOM and applies only the minimal DOM changes.
+    //
+    // This is analogous to React's useState() — but without the setter function.
+    // You just assign the field and call StateHasChanged() if outside an event
+    // handler. Inside event handlers and lifecycle methods, Blazor does it for you.
+    // =============================================================================
+
+    private bool isLoading = true;
+    private string? errorMessage;
+    private List<UserDto> users = new();
+
+    // =============================================================================
+    // LIFECYCLE: OnInitializedAsync
+    //
+    // This is the primary lifecycle method for async data fetching in Blazor.
+    // It runs once when the component is first added to the render tree.
+    //
+    // Blazor lifecycle (simplified):
+    //   1. Constructor          — component instantiated
+    //   2. SetParametersAsync   — parameters from parent applied
+    //   3. OnInitialized        — sync setup (runs before first render)
+    //   4. [First render]       — HTML emitted, loading spinner shows
+    //   5. OnInitializedAsync   — async work (data fetch); awaiting yields to renderer
+    //   6. [Re-render]          — called automatically when await completes
+    //   7. OnAfterRender        — DOM is live; safe to call JS interop here
+    //
+    // Compare to React: useEffect(() => { fetchData() }, [])
+    // =============================================================================
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // TODO: Replace with StrawberryShake typed call:
+            //   IGetUsersResult result = await Client.GetUsersAsync();
+            //   users = result.Users.Select(u => new UserDto(u.Id, u.Username, u.Email, u.CreatedAt)).ToList();
+
+            // Temporary: raw GraphQL POST until SS is wired up
+            using var response = await Http.PostAsJsonAsync("api/graphql", new
+            {
+                query = "{ users { id username email createdAt } }"
+            });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = $"API error: {response.StatusCode}";
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<UsersData>>();
+
+            // GraphQL servers often return HTTP 200 even for application-level
+            // errors — those live in the response body's errors collection rather
+            // than solely in the HTTP status code. Non-2xx statuses are already
+            // caught by the IsSuccessStatusCode check above.
+            // A null result means the JSON didn't deserialise at all.
+            if (result is null)
+            {
+                errorMessage = "Failed to parse GraphQL response from API.";
+                return;
+            }
+
+            if (result.Errors is { Count: > 0 } topLevelErrors)
+            {
+                errorMessage = $"GraphQL error(s): {string.Join("; ", topLevelErrors.Select(e => e.Message))}";
+                return;
+            }
+
+            users = result.Data?.Users ?? new List<UserDto>();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load users: {ex.Message}";
+        }
+        finally
+        {
+            // Always clear the loading state, even if an exception occurred.
+            // Without this, the spinner would spin forever on error.
+            isLoading = false;
+        }
+    }
+
+    // =============================================================================
+    // LOCAL DTOs — Temporary until StrawberryShake generates these from the schema.
+    //
+    // StrawberryShake will generate strongly-typed classes from the GetUsers.graphql
+    // operation file and schema.graphql. These manual classes go away at that point.
+    // =============================================================================
+
+    private record UserDto(int Id, string Username, string Email, DateTime CreatedAt);
+    private record UsersData(List<UserDto> Users);
+    // GraphQLResponse<T> and GraphQLError live in GraphQL/Models/GraphQLResponse.cs
+}

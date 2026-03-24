@@ -67,7 +67,7 @@ public class UserRepositoryTests
         var user = new User { Username = "find_me", Email = "f@m.com", PasswordHash = "hash" };
         await repo.AddAsync(user, CancellationToken.None);
 
-        var found = await repo.GetByIdAsync(user.Id);
+        var found = await repo.GetByIdAsync(user.Id, CancellationToken.None);
 
         Assert.NotNull(found);
         Assert.Equal("find_me", found!.Username);
@@ -84,7 +84,7 @@ public class UserRepositoryTests
         using var context = CreateInMemoryContext();
         var repo = new UserRepository(context);
 
-        var found = await repo.GetByIdAsync(999);
+        var found = await repo.GetByIdAsync(999, CancellationToken.None);
 
         Assert.Null(found);
     }

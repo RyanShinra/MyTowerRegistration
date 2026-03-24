@@ -1,0 +1,43 @@
+@* =============================================================================
+   MAINLAYOUT.RAZOR — The Shell
+
+   @inherits LayoutComponentBase marks this as a layout rather than a page.
+   Layouts are wrappers — they define the persistent chrome (nav, header,
+   footer) and expose a @Body placeholder where the current page renders.
+
+   Compare to:
+     - ASP.NET MVC: _Layout.cshtml with @RenderBody()
+     - React: a wrapper component with {children}
+     - Next.js: app/layout.tsx with {children}
+
+   Every page component that uses DefaultLayout (set in App.razor) will be
+   rendered in place of @Body here. The nav sidebar and top row persist
+   across page navigations — only the @Body region changes.
+   ============================================================================= *@
+
+@inherits LayoutComponentBase
+
+<div class="page">
+    <div class="sidebar">
+        @* NavMenu.razor is a separate component — it handles its own collapse
+           state internally. This is component composition: the layout doesn't
+           need to know how the nav works, just that it exists. *@
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <span class="text-muted small">MyTower Admin</span>
+        </div>
+
+        <article class="content px-4">
+            @* @Body is the Blazor equivalent of {children} in React or
+               @RenderBody() in MVC. The matched page component renders here. *@
+            @Body
+        </article>
+    </main>
+</div>
+
+@* The #blazor-error-ui div in index.html surfaces unhandled exceptions in dev.
+   In production, Blazor swallows errors silently unless you configure error
+   boundaries — that's a future concern. *@

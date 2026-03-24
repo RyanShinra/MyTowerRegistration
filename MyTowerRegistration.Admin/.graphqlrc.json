@@ -1,0 +1,12 @@
+{
+  "schema": "../schema.graphql",
+  "documents": "./GraphQL/**/*.graphql",
+  "extensions": {
+    "strawberryShake": {
+      "name": "MyTowerClient",
+      "namespace": "MyTowerRegistration.Admin.GraphQL",
+      "url": "http://localhost:5026/api/graphql",
+      "dependencyInjection": true
+    }
+  }
+}
