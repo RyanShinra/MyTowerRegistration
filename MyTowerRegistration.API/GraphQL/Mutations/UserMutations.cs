@@ -26,7 +26,7 @@ using MyTowerRegistration.Data.Repositories;
 using System.Security.Cryptography;
 using System.Text;
 
-using UEC = MyTowerRegistration.API.GraphQL.Types.UserErrorCode;
+using UEC = MyTowerRegistration.API.GraphQL.Types.CreateUserErrorCode;
 using RPayload = MyTowerRegistration.API.GraphQL.Types.RegisterUserPayload;
 namespace MyTowerRegistration.API.GraphQL.Mutations;
 
@@ -45,7 +45,7 @@ public class UserMutations
     //   {
     //       // Step A: Validate email format
     //       //   - Use a simple check or System.Net.Mail.MailAddress.TryCreate()
-    //       //   - If invalid, return: new RegisterUserPayload(null, [new UserError(...)])
+    //       //   - If invalid, return: new RegisterUserPayload(null, [new CreateUserError(...)])
     //       //   - Error code: "INVALID_EMAIL"
     //
     //       // Step B: Check if username is taken
@@ -83,7 +83,7 @@ public class UserMutations
         CancellationToken ct)
     {
         RPayload ErrorPayload(string message, UEC code)
-            => new(null, [new UserError(message, code)]);
+            => new(null, [new CreateUserError(message, code)]);
 
         bool TryCreateEmail() => System.Net.Mail.MailAddress.TryCreate(input.Email, out _);
 

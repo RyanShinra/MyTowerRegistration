@@ -9,9 +9,14 @@ schema {
   mutation: UserMutations
 }
 
+type CreateUserError {
+  message: String!
+  code: CreateUserErrorCode!
+}
+
 type RegisterUserPayload {
   user: User
-  errors: [UserError!]
+  errors: [CreateUserError!]
 }
 
 "A registered user"
@@ -20,11 +25,6 @@ type User {
   username: String!
   email: String!
   createdAt: DateTime!
-}
-
-type UserError {
-  message: String!
-  code: UserErrorCode!
 }
 
 type UserMutations {
@@ -42,7 +42,7 @@ input RegisterUserInput {
   password: String!
 }
 
-enum UserErrorCode {
+enum CreateUserErrorCode {
   INVALID_EMAIL
   INVALID_USERNAME
   USERNAME_TAKEN

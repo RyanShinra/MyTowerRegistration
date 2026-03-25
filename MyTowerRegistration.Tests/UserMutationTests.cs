@@ -92,7 +92,7 @@ public class UserMutationTests
         Assert.Null(result.User);
         Assert.NotNull(result.Errors);
         Assert.Single(result.Errors!);
-        Assert.Equal(UserErrorCode.UsernameTaken, result.Errors![0].Code);
+        Assert.Equal(CreateUserErrorCode.UsernameTaken, result.Errors![0].Code);
 
         // Verify AddAsync was NEVER called (we short-circuited)
         _mockRepo.Verify(r => r.AddAsync(It.IsAny<User>(), CancellationToken.None), Times.Never);
@@ -117,7 +117,7 @@ public class UserMutationTests
 
         Assert.Null(result.User);
         Assert.NotNull(result.Errors);
-        Assert.Equal(UserErrorCode.EmailTaken, result.Errors![0].Code);
+        Assert.Equal(CreateUserErrorCode.EmailTaken, result.Errors![0].Code);
     }
 
     // -------------------------------------------------------------------------
@@ -134,7 +134,7 @@ public class UserMutationTests
 
         Assert.Null(result.User);
         Assert.NotNull(result.Errors);
-        Assert.Equal(UserErrorCode.InvalidEmail, result.Errors![0].Code);
+        Assert.Equal(CreateUserErrorCode.InvalidEmail, result.Errors![0].Code);
 
         // No DB calls should happen for a validation failure
         _mockRepo.Verify(r => r.UsernameExistsAsync(It.IsAny<string>(), CancellationToken.None), Times.Never);
