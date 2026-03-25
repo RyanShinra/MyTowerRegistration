@@ -51,4 +51,7 @@ public interface IUserRepository
     // TODO 6: Task<bool> EmailExistsAsync(string email)
     //   - Same pattern as UsernameExistsAsync
     Task<bool> EmailExistsAsync(string email, CancellationToken ct);
+
+    // Added during Admin Gui tutorial
+    Task<bool> DeleteAsync(int id, CancellationToken ct);
 }

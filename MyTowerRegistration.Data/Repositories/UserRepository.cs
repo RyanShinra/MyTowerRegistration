@@ -98,4 +98,14 @@ public class UserRepository : IUserRepository
     {
         return await _context.Users.AnyAsync(user => user.Email == searchEmail, ct);
     }
+
+    public async Task<bool> DeleteAsync(int id, CancellationToken ct)
+    {
+        User? deleteTgt = await _context.Users.FindAsync(id, ct);
+        if (deleteTgt is null) return false;
+
+        _context.Users.Remove(deleteTgt);
+        await _context.SaveChangesAsync(ct);
+        return true;
+    }
 }
