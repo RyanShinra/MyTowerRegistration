@@ -142,7 +142,7 @@
             }
 
             var result = await response.Content
-                .ReadFromJsonAsync<GraphQLResponse<RegisterData>>();
+                .ReadFromJsonAsync<GraphQLResponse<RegisterUserData>>();
 
             // Check top-level GraphQL errors first (resolver exceptions, auth failures, etc.)
             // These are distinct from the error-as-data payload errors checked below.
@@ -158,7 +158,7 @@
                 return;
             }
 
-            var payload = result.Data?.RegisterUser;
+            var payload = result.Data?.RegistrationPayload;
 
             if (payload?.Errors is { Count: > 0 } validationErrors)
             {
@@ -166,7 +166,7 @@
                 // not as HTTP errors. We surface them here.
                 errorMessage = string.Join(" | ", validationErrors.Select(e => $"{e.Code}: {e.Message}"));
             }
-            else if (payload?.User is not null)
+            else if (payload?.CreatedUser is not null)
             {
                 // Navigate to the user list so the new user is immediately visible.
                 // NavigationManager.NavigateTo() is the Blazor equivalent of
@@ -211,9 +211,9 @@
     }
 
     // Temporary DTOs — replaced by SS-generated types once codegen runs
-    private record UserResult(int Id, string Username, string Email);
-    private record UserError(string Message, string Code);
-    private record RegisterPayload(UserResult? User, List<UserError>? Errors);
-    private record RegisterData(RegisterPayload RegisterUser);
+    private record CreateUserResult(int Id, string Username, string Email);
+    private record CreateUserError(string Message, string Code);
+    private record RegisterUserPayload(CreateUserResult? CreatedUser, List<CreateUserError>? Errors);
+    private record RegisterUserData(RegisterUserPayload RegistrationPayload);
     // GraphQLResponse<T> and GraphQLError live in GraphQL/Models/GraphQLResponse.cs
 }
