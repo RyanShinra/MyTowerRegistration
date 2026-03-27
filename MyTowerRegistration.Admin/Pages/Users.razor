@@ -48,7 +48,7 @@ else
                 <th>Username</th>
                 <th>Email</th>
                 <th>Registered</th>
-                @* TODO: Add an Actions column header *@
+                <th>Remove User</th>
             </tr>
         </thead>
         <tbody>
@@ -188,5 +188,8 @@ else
     private record UsersData(List<UserDto> Users);
 
     // TODO: Add DTOs for the deleteUser response payload
+    private record DeleteUserError(string Message, string Code); // Code is actually an enum, but we're using a string since this is all a placeholder for now
+    private record DeleteUserPayload(UserDto? DeletedUser, List<DeleteUserError>? Errors);
+    private record DeleteUserData(DeleteUserPayload DeletionPayload);
     // GraphQLResponse<T> and GraphQLError live in GraphQL/Models/GraphQLResponse.cs
 }
