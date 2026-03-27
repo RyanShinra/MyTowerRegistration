@@ -95,10 +95,8 @@ public class UserMutations
             if (input.Username.Length < 3 || input.Username.Length > 20)
                 return ErrorPayload("Username must be between 3 and 20 characters", UEC.InvalidUsername);
 
-            return null; 
+            return null;
         }
-            
-        
 
         RPayload? ValidateEmail() => !TryCreateEmail()
             ? ErrorPayload("Invalid e-mail address", UEC.InvalidEmail) 
@@ -145,5 +143,19 @@ public class UserMutations
         byte[] pwBytes = Encoding.UTF8.GetBytes(password);
         var hashBytes = SHA256.HashData(pwBytes);
         return Convert.ToHexString(hashBytes).ToLowerInvariant();
+    }
+
+    public async Task<DeleteUserPayload> DeleteUser(int id, [Service] IUserRepository userRepository, CancellationToken ct)
+    {
+        User? deleteTgt = await userRepository.GetByIdAsync(id, ct);
+        if (deleteTgt == null) {
+            return new DeleteUserPayload(null, [new DeleteUserError("User Not Found", DeleteUserErrorCode.UserNotFound)]);
+        }
+
+        if (await userRepository.DeleteAsync(id, ct)) {
+            return new DeleteUserPayload(deleteTgt, null);
+        }
+
+        return new DeleteUserPayload(null, [new DeleteUserError("Unknown Error", DeleteUserErrorCode.Unknown)]);
     }
 }
