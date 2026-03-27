@@ -48,6 +48,7 @@ else
                 <th>Username</th>
                 <th>Email</th>
                 <th>Registered</th>
+                @* TODO: Add an Actions column header *@
             </tr>
         </thead>
         <tbody>
@@ -60,10 +61,15 @@ else
                     <td>@user.Username</td>
                     <td>@user.Email</td>
                     <td>@user.CreatedAt.ToString("yyyy-MM-dd")</td>
+                    @* TODO: Add a Delete button cell here.
+                       Hint: @onclick="() => HandleDelete(user.Id)"
+                       Hint: capture user.Id (not user) to avoid the foreach closure capture bug *@
                 </tr>
             }
         </tbody>
     </table>
+
+    @* TODO: Show deleteErrorMessage here if it's not null *@
 }
 
 @code {
@@ -82,6 +88,10 @@ else
     private bool isLoading = true;
     private string? errorMessage;
     private List<UserDto> users = new();
+
+    // TODO: Add state fields for deletion:
+    //   - An int? to track which row's button is currently "in flight" (for disabling it)
+    //   - A string? for delete error messages
 
     // =============================================================================
     // LIFECYCLE: OnInitializedAsync
@@ -153,6 +163,20 @@ else
         }
     }
 
+    // TODO: Implement HandleDelete(int id)
+    //
+    // The mutation to send:
+    //
+    //   mutation DeleteUser($id: Int!) {
+    //       deleteUser(id: $id) {
+    //           user { id username }
+    //           errors { message code }
+    //       }
+    //   }
+    //
+    // Follow the same try/finally + two-step error check pattern as HandleSubmit
+    // in Register.razor. On success, decide: local list remove, or full re-fetch?
+
     // =============================================================================
     // LOCAL DTOs — Temporary until StrawberryShake generates these from the schema.
     //
@@ -162,5 +186,7 @@ else
 
     private record UserDto(int Id, string Username, string Email, DateTime CreatedAt);
     private record UsersData(List<UserDto> Users);
+
+    // TODO: Add DTOs for the deleteUser response payload
     // GraphQLResponse<T> and GraphQLError live in GraphQL/Models/GraphQLResponse.cs
 }
