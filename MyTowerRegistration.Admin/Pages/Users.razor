@@ -28,19 +28,16 @@
 @* TODO: Replace HttpClient with StrawberryShake typed client:
    @inject IMyTowerClient Client *@
 
-@if (isLoading)
-{
+@if (isLoading) {
     @* Show a spinner while the GraphQL query is in flight.
        In Blazor WASM, this renders client-side as soon as the component mounts
        and OnInitializedAsync begins its await. *@
     <p><em>Loading...</em></p>
 }
-else if (errorMessage is not null)
-{
+else if (errorMessage is not null) {
     <div class="alert alert-danger">@errorMessage</div>
 }
-else
-{
+else {
     <table class="table">
         <thead>
             <tr>
@@ -54,25 +51,35 @@ else
         <tbody>
             @* @foreach in a template is C# — the @ prefix signals to Razor
                that what follows is C# code, not HTML markup. *@
-            @foreach (var user in users)
-            {
+            @foreach (var user in users) {
                 <tr>
                     <td>@user.Id</td>
                     <td>@user.Username</td>
                     <td>@user.Email</td>
                     <td>@user.CreatedAt.ToString("yyyy-MM-dd")</td>
-                    @* TODO: Add a Delete button cell here.
-                       Hint: @onclick="() => HandleDelete(user.Id)"
-                       Hint: capture user.Id (not user) to avoid the foreach closure capture bug *@
+                    <td>
+                        <button class="btn btn-danger btn-sm"
+                                @onclick="() => HandleDelete(user.Id)"
+                                @disabled="@(deletionId is not null)"
+                        >
+                            @(deletionId == user.Id ?  "⏳" : "Delete")
+                        </button>
+                    </td>
                 </tr>
             }
         </tbody>
     </table>
 
     @* TODO: Show deleteErrorMessage here if it's not null *@
+    @if (deletionErrorMessage is not null) {
+        <div class="alert alert-danger">@deletionErrorMessage</div>
+    }
 }
 
 @code {
+
+
+
     // =============================================================================
     // COMPONENT STATE
     //
@@ -89,9 +96,13 @@ else
     private string? errorMessage;
     private List<UserDto> users = new();
 
+
+
     // TODO: Add state fields for deletion:
     //   - An int? to track which row's button is currently "in flight" (for disabling it)
     //   - A string? for delete error messages
+    private int? deletionId;
+    private string? deletionErrorMessage;
 
     // =============================================================================
     // LIFECYCLE: OnInitializedAsync
@@ -112,20 +123,17 @@ else
     // =============================================================================
     protected override async Task OnInitializedAsync()
     {
-        try
-        {
+        try {
             // TODO: Replace with StrawberryShake typed call:
             //   IGetUsersResult result = await Client.GetUsersAsync();
             //   users = result.Users.Select(u => new UserDto(u.Id, u.Username, u.Email, u.CreatedAt)).ToList();
 
             // Temporary: raw GraphQL POST until SS is wired up
-            using var response = await Http.PostAsJsonAsync("api/graphql", new
-            {
+            using var response = await Http.PostAsJsonAsync("api/graphql", new {
                 query = "{ users { id username email createdAt } }"
             });
 
-            if (!response.IsSuccessStatusCode)
-            {
+            if (!response.IsSuccessStatusCode) {
                 errorMessage = $"API error: {response.StatusCode}";
                 return;
             }
@@ -137,31 +145,29 @@ else
             // than solely in the HTTP status code. Non-2xx statuses are already
             // caught by the IsSuccessStatusCode check above.
             // A null result means the JSON didn't deserialise at all.
-            if (result is null)
-            {
+            if (result is null) {
                 errorMessage = "Failed to parse GraphQL response from API.";
                 return;
             }
 
-            if (result.Errors is { Count: > 0 } topLevelErrors)
-            {
+            if (result.Errors is { Count: > 0 } topLevelErrors) {
                 errorMessage = $"GraphQL error(s): {string.Join("; ", topLevelErrors.Select(e => e.Message))}";
                 return;
             }
 
             users = result.Data?.Users ?? new List<UserDto>();
         }
-        catch (Exception ex)
-        {
+        catch (Exception ex) {
             errorMessage = $"Failed to load users: {ex.Message}";
         }
-        finally
-        {
+        finally {
             // Always clear the loading state, even if an exception occurred.
             // Without this, the spinner would spin forever on error.
             isLoading = false;
         }
     }
+
+
 
     // TODO: Implement HandleDelete(int id)
     //
@@ -174,8 +180,72 @@ else
     //       }
     //   }
     //
+
     // Follow the same try/finally + two-step error check pattern as HandleSubmit
+
     // in Register.razor. On success, decide: local list remove, or full re-fetch?
+
+    private async Task HandleDelete(int id)
+    {
+
+        if (deletionId is not null) return; // can only delete one at a time
+        this.deletionId = id;
+        try {
+            using var response = await Http.PostAsJsonAsync("api/graphql", new {
+                query = """
+                      mutation DeleteUser($id: Int!) {
+                          deleteUser(id: $id) {
+                              user { id username }
+                              errors { message code }
+                          }
+                      }
+                    """,
+                variables = new {
+                    id = this.deletionId
+                }
+            });
+
+            if (!response.IsSuccessStatusCode) {
+                deletionErrorMessage = $"API error: {response.StatusCode}";
+                return;
+            }
+
+            var result = await response.Content
+                .ReadFromJsonAsync<GraphQLResponse<DeleteUserData>>();
+
+            // Check top-level GraphQL errors first (resolver exceptions, auth failures, etc.)
+            // These are distinct from the error-as-data payload errors checked below.
+            if (result is null) {
+                deletionErrorMessage = "Failed to parse GraphQL response from API.";
+                return;
+            }
+
+            if (result.Errors is { Count: > 0 } topLevelErrors) {
+                deletionErrorMessage = $"GraphQL error(s): {string.Join("; ", topLevelErrors.Select(e => e.Message))}";
+                return;
+            }
+
+            var payload = result.Data?.DeleteUser;
+
+            if (payload?.Errors is { Count: > 0 } validationErrors) {
+                // The API returns validation errors as data (error-as-data pattern),
+                // not as HTTP errors. We surface them here.
+                deletionErrorMessage = string.Join(" | ", validationErrors.Select(e => $"{e.Code}: {e.Message}"));
+            }
+            else if (payload?.User is not null) {
+
+                this.users.RemoveAll(users => users.Id == this.deletionId);
+            }
+        }
+        catch (Exception ex) {
+            deletionErrorMessage = $"Unexpected error: {ex.Message}";
+        }
+        finally {
+            this.deletionId = null;
+        }
+
+    }
+
 
     // =============================================================================
     // LOCAL DTOs — Temporary until StrawberryShake generates these from the schema.
@@ -189,7 +259,8 @@ else
 
     // TODO: Add DTOs for the deleteUser response payload
     private record DeleteUserError(string Message, string Code); // Code is actually an enum, but we're using a string since this is all a placeholder for now
-    private record DeleteUserPayload(UserDto? DeletedUser, List<DeleteUserError>? Errors);
-    private record DeleteUserData(DeleteUserPayload DeletionPayload);
+    private record DeleteUserPayload(UserDto? User, List<DeleteUserError>? Errors);
+    private record DeleteUserData(DeleteUserPayload DeleteUser);
     // GraphQLResponse<T> and GraphQLError live in GraphQL/Models/GraphQLResponse.cs
 }
+@* End @code *@

@@ -14,6 +14,77 @@
 *.md text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
+*.razor text eol=lf
+*.graphql text = eol=lf
+
+*.html text eol=lf
+*.htm text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.sass text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.jsx text eol=lf
+
+# Configuration files
+*.config text eol=lf
+*.editorconfig text eol=lf
+.gitignore text eol=lf
+
+# MSBuild files
+*.props text eol=lf
+*.targets text eol=lf
+
+# Resource files (text-based)
+*.resx text eol=lf
+
+# SVG (text-based vector graphics)
+*.svg text eol=lf
+
+# Docker files
+Dockerfile* text eol=lf
+*.dockerignore text eol=lf
+
+# Shell scripts (Unix/Linux)
+*.sh text eol=lf
+
+# PowerShell scripts
+*.ps1 text eol=lf
+*.psm1 text eol=lf
+
+# Environment files
+*.env text eol=lf
+.env.* text eol=lf
+
+# Other text files
+*.txt text eol=lf
+
+# ASP.NET files (if you have any legacy views)
+*.cshtml text eol=lf
+
+# Configuration files
+*.config text eol=lf
+.editorconfig text eol=lf
+.gitignore text eol=lf
+
+# MSBuild files
+*.props text eol=lf
+*.targets text eol=lf
+
+# Resource files
+*.resx text eol=lf
+
+# SVG (vector graphics)
+*.svg text eol=lf
+
+# Scripts
+*.sh text eol=lf
+*.ps1 text eol=lf
+
+# Other text files
+*.txt text eol=lf
+*.cshtml text eol=lf
 
 # Denote binary files
 *.dll binary
