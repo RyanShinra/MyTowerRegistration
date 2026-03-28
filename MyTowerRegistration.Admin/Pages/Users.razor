@@ -189,8 +189,10 @@ else {
     {
 
         if (deletionId is not null) return; // can only delete one at a time
+        deletionErrorMessage = null;
         this.deletionId = id;
         try {
+            // Temporary: raw GraphQL POST until SS is wired up
             using var response = await Http.PostAsJsonAsync("api/graphql", new {
                 query = """
                       mutation DeleteUser($id: Int!) {
@@ -201,7 +203,7 @@ else {
                       }
                     """,
                 variables = new {
-                    id = this.deletionId
+                    id = id  // use the parameter directly, not this.deletionId (which is nullable)
                 }
             });
 
