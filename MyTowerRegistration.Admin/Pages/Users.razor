@@ -168,29 +168,12 @@ else {
     }
 
 
-
-    // TODO: Implement HandleDelete(int id)
-    //
-    // The mutation to send:
-    //
-    //   mutation DeleteUser($id: Int!) {
-    //       deleteUser(id: $id) {
-    //           user { id username }
-    //           errors { message code }
-    //       }
-    //   }
-    //
-
-    // Follow the same try/finally + two-step error check pattern as HandleSubmit
-
-    // in Register.razor. On success, decide: local list remove, or full re-fetch?
-
-    private async Task HandleDelete(int id)
+    private async Task HandleDelete(int userIdToDelete)
     {
 
         if (deletionId is not null) return; // can only delete one at a time
         deletionErrorMessage = null;
-        this.deletionId = id;
+        this.deletionId = userIdToDelete;
         try {
             // Temporary: raw GraphQL POST until SS is wired up
             using var response = await Http.PostAsJsonAsync("api/graphql", new {
@@ -203,7 +186,7 @@ else {
                       }
                     """,
                 variables = new {
-                    id = id  // use the parameter directly, not this.deletionId (which is nullable)
+                    id = userIdToDelete  // use the parameter directly, not this.deletionId (which is nullable)
                 }
             });
 
@@ -236,7 +219,7 @@ else {
             }
             else if (payload?.User is not null) {
 
-                this.users.RemoveAll(users => users.Id == this.deletionId);
+                this.users.RemoveAll(curUser => curUser.Id == userIdToDelete);
             }
         }
         catch (Exception ex) {
