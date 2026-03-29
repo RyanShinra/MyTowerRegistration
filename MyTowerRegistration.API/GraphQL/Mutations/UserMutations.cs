@@ -147,15 +147,10 @@ public class UserMutations
 
     public async Task<DeleteUserPayload> DeleteUser(int id, [Service] IUserRepository userRepository, CancellationToken ct)
     {
-        User? deleteTgt = await userRepository.GetByIdAsync(id, ct);
-        if (deleteTgt == null) {
+        User? justDeleted = await userRepository.DeleteAsync(id, ct);
+        if (justDeleted is null) {
             return new DeleteUserPayload(null, [new DeleteUserError("User Not Found", DeleteUserErrorCode.UserNotFound)]);
         }
-
-        if (await userRepository.DeleteAsync(id, ct)) {
-            return new DeleteUserPayload(deleteTgt, null);
-        }
-
-        return new DeleteUserPayload(null, [new DeleteUserError("Unknown Error", DeleteUserErrorCode.Unknown)]);
+        return new DeleteUserPayload(justDeleted, null);
     }
 }
