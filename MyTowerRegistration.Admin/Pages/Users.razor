@@ -217,8 +217,16 @@ else {
                 deletionErrorMessage = string.Join(" | ", validationErrors.Select(e => $"{e.Code}: {e.Message}"));
             }
             else if (payload?.User is not null) {
-
                 this.users.RemoveAll(curUser => curUser.Id == userIdToDelete);
+            }
+            else {
+                // Fallback: the server returned HTTP 200 with no top-level errors, but
+                // the payload had neither a deleted user nor any validation errors.
+                // This shouldn't happen with our resolver, but if it does it means the
+                // response shape didn't match what we expected — surface it rather than
+                // silently doing nothing. StrawberryShake will eliminate this case by
+                // catching shape mismatches at compile time.
+                deletionErrorMessage = "Delete did not return a result. The user may not have been deleted.";
             }
         }
         catch (Exception ex) {
