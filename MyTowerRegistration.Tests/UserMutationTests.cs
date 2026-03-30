@@ -81,7 +81,7 @@ public class UserMutationTests
             .ReturnsAsync(true);
         _mockRepo.Setup(repo => repo.EmailExistsAsync(It.IsAny<string>(), CancellationToken.None))
             .ReturnsAsync(false);
-        
+
         // Input with the taken username
         var input = new RegisterUserInput("taken", "new@example.com", "Password123");
 
@@ -163,7 +163,7 @@ public class UserMutationTests
         const int testUserId = 42;
         const string testUsername = "targetUser";
         const string testEmail = "target@example.com";
-        
+
         // Arrange: The existing user will be returned by DeleteAsync (we will compare the fields below)
         var existingUser = new User { Id = testUserId, Username = testUsername, Email = testEmail };
         _mockRepo.Setup(repo => repo.DeleteAsync(testUserId, CancellationToken.None))
@@ -215,16 +215,22 @@ public class UserMutationTests
     [Fact]
     public async Task DeleteUser_OnlyCallsDeleteAsync_NeverCallsGetByIdAsync()
     {
-        // Arrange
+        // Arrange: Create an existing user, notionally already in the DB. When you delete it, it is returned via the 'STL' convention
         var existingUser = new User { Id = 1, Username = "user", Email = "user@user.com" };
-        _mockRepo.Setup(repo => repo.DeleteAsync(1, CancellationToken.None))
+        _mockRepo.Setup(repo => repo.DeleteAsync(existingUser.Id, CancellationToken.None))
             .ReturnsAsync(existingUser);
 
         // Act — same call as the success test
         var result = await _mutations.DeleteUser(existingUser.Id, _mockRepo.Object, CancellationToken.None);
-        // Assert
+        // Assert: The mutation only called delete once on the DB, it never called the GetById (the old pattern which has the race condition)
         _mockRepo.Verify(repo => repo.DeleteAsync(existingUser.Id, CancellationToken.None), Times.Once);
         _mockRepo.Verify(repo => repo.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        
+        // That we got back the right kind of response
+        Assert.NotNull(result);
+        Assert.NotNull(result.User);
+        Assert.Null(result.Errors);
+        Assert.Equal(existingUser, result.User);
     }
 
     // -------------------------------------------------------------------------
