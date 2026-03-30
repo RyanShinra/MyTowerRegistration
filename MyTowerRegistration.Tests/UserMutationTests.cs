@@ -46,11 +46,11 @@ public class UserMutationTests
     public async Task RegisterUser_WithValidInput_ReturnsUserAndNoErrors()
     {
         // Arrange — set up the mock to simulate "no conflicts"
-        _mockRepo.Setup(r => r.UsernameExistsAsync(It.IsAny<string>(), CancellationToken.None))
+        _mockRepo.Setup(repo => repo.UsernameExistsAsync(It.IsAny<string>(), CancellationToken.None))
             .ReturnsAsync(false);
-        _mockRepo.Setup(r => r.EmailExistsAsync(It.IsAny<string>(), CancellationToken.None))
+        _mockRepo.Setup(repo => repo.EmailExistsAsync(It.IsAny<string>(), CancellationToken.None))
             .ReturnsAsync(false);
-        _mockRepo.Setup(r => r.AddAsync(It.IsAny<User>(), CancellationToken.None))
+        _mockRepo.Setup(repo => repo.AddAsync(It.IsAny<User>(), CancellationToken.None))
             .ReturnsAsync((User u) => { u.Id = 1; return u; });
 
         var input = new RegisterUserInput("testuser", "test@example.com", "Password123");
@@ -65,7 +65,7 @@ public class UserMutationTests
         Assert.Equal("test@example.com", result.User.Email);
 
         // Verify the repository was called
-        _mockRepo.Verify(r => r.AddAsync(It.IsAny<User>(), CancellationToken.None), Times.Once);
+        _mockRepo.Verify(repo => repo.AddAsync(It.IsAny<User>(), CancellationToken.None), Times.Once);
     }
 
     // -------------------------------------------------------------------------
@@ -77,9 +77,9 @@ public class UserMutationTests
     public async Task RegisterUser_WithDuplicateUsername_ReturnsError()
     {
         // Arrange — username already exists
-        _mockRepo.Setup(r => r.UsernameExistsAsync("taken", CancellationToken.None))
+        _mockRepo.Setup(repo => repo.UsernameExistsAsync("taken", CancellationToken.None))
             .ReturnsAsync(true);
-        _mockRepo.Setup(r => r.EmailExistsAsync(It.IsAny<string>(), CancellationToken.None))
+        _mockRepo.Setup(repo => repo.EmailExistsAsync(It.IsAny<string>(), CancellationToken.None))
             .ReturnsAsync(false);
         
         // Input with the taken username
@@ -95,7 +95,7 @@ public class UserMutationTests
         Assert.Equal(CreateUserErrorCode.UsernameTaken, result.Errors![0].Code);
 
         // Verify AddAsync was NEVER called (we short-circuited)
-        _mockRepo.Verify(r => r.AddAsync(It.IsAny<User>(), CancellationToken.None), Times.Never);
+        _mockRepo.Verify(repo => repo.AddAsync(It.IsAny<User>(), CancellationToken.None), Times.Never);
     }
 
     // -------------------------------------------------------------------------
@@ -106,17 +106,23 @@ public class UserMutationTests
     [Fact]
     public async Task RegisterUser_WithDuplicateEmail_ReturnsError()
     {
-        _mockRepo.Setup(r => r.UsernameExistsAsync(It.IsAny<string>(), CancellationToken.None))
+        // Arrange: Attempt to create a new user [username doesn't exist, return false]
+        // but with an existing email address [exists returns true]
+        _mockRepo.Setup(repo => repo.UsernameExistsAsync(It.IsAny<string>(), CancellationToken.None))
             .ReturnsAsync(false);
-        _mockRepo.Setup(r => r.EmailExistsAsync("taken@example.com", CancellationToken.None))
+        _mockRepo.Setup(repo => repo.EmailExistsAsync("taken@example.com", CancellationToken.None))
             .ReturnsAsync(true);
 
+        // Create a new user, only the email address matters
         var input = new RegisterUserInput("newuser", "taken@example.com", "Password123");
 
         var result = await _mutations.RegisterUser(input, _mockRepo.Object, CancellationToken.None);
 
+        // Error returns from GQL land with no user (couldn't create), 
+        // and one error of the EmailTaken
         Assert.Null(result.User);
         Assert.NotNull(result.Errors);
+        Assert.Single(result.Errors);
         Assert.Equal(CreateUserErrorCode.EmailTaken, result.Errors![0].Code);
     }
 
@@ -128,16 +134,97 @@ public class UserMutationTests
     [Fact]
     public async Task RegisterUser_WithInvalidEmail_ReturnsError()
     {
+        // Create a user with a valid username and password (they will be checked, too)
         var input = new RegisterUserInput("user", "not-an-email", "Password123");
 
+        // Call the test function
+        // (Implicitly, the bad email check should happen and bail out before trying to call into the DB).
         var result = await _mutations.RegisterUser(input, _mockRepo.Object, CancellationToken.None);
 
+        // Similar error pattern, null user, 1 error with correct error code
         Assert.Null(result.User);
         Assert.NotNull(result.Errors);
+        Assert.Single(result.Errors);
         Assert.Equal(CreateUserErrorCode.InvalidEmail, result.Errors![0].Code);
 
         // No DB calls should happen for a validation failure
-        _mockRepo.Verify(r => r.UsernameExistsAsync(It.IsAny<string>(), CancellationToken.None), Times.Never);
+        _mockRepo.Verify(repo => repo.UsernameExistsAsync(It.IsAny<string>(), CancellationToken.None), Times.Never);
+    }
+
+    // -------------------------------------------------------------------------
+    // TEST: DeleteUser — success path
+    // -------------------------------------------------------------------------
+    // DeleteAsync returns the deleted User → payload should have that User, no errors.
+    //
+    [Fact]
+    public async Task DeleteUser_WithExistingId_ReturnsDeletedUserAndNoErrors()
+    {
+        //User properties:
+        const int testUserId = 42;
+        const string testUsername = "targetUser";
+        const string testEmail = "target@example.com";
+        
+        // Arrange: The existing user will be returned by DeleteAsync (we will compare the fields below)
+        var existingUser = new User { Id = testUserId, Username = testUsername, Email = testEmail };
+        _mockRepo.Setup(repo => repo.DeleteAsync(testUserId, CancellationToken.None))
+            .ReturnsAsync(existingUser);
+
+        // Act: Delete the user 
+        DeleteUserPayload result = await _mutations.DeleteUser(testUserId, _mockRepo.Object, CancellationToken.None);
+
+        // Assert — The user should be not null with matching fields, the error property should be null (i.e. deleted successfully)
+        Assert.Null(result.Errors);
+        Assert.NotNull(result.User);
+        Assert.Equal(testUserId, result.User.Id);
+        Assert.Equal(testUsername, result.User.Username);
+        Assert.Equal(testEmail, result.User.Email);
+    }
+
+    // -------------------------------------------------------------------------
+    // TEST: DeleteUser — user not found
+    // -------------------------------------------------------------------------
+    // DeleteAsync returns null (user never existed, or concurrent deletion) →
+    // payload should have no User and a UserNotFound error.
+    //
+    [Fact]
+    public async Task DeleteUser_WithNonExistentId_ReturnsUserNotFoundError()
+    {
+        //Delete User properties
+        const int delUserId = 99;
+        // Arrange: The database will return null user when called with `delUserId`
+        _mockRepo.Setup(repo => repo.DeleteAsync(delUserId, CancellationToken.None))
+            .ReturnsAsync((User?)null);
+
+        // Act
+        var result = await _mutations.DeleteUser(delUserId, _mockRepo.Object, CancellationToken.None);
+
+        // Assert — verify result.User is null, result.Errors has one UserNotFound entry
+        Assert.Null(result.User);
+        Assert.NotNull(result.Errors);
+        Assert.Single<DeleteUserError>(result.Errors);
+        Assert.Equal(DeleteUserErrorCode.UserNotFound, result.Errors[0].Code);
+    }
+
+    // -------------------------------------------------------------------------
+    // TEST: DeleteUser — single repository call (TOCTOU guard)
+    // -------------------------------------------------------------------------
+    // The resolver must call DeleteAsync exactly once and must NOT call
+    // GetByIdAsync at all. If someone reverts to the two-call pattern this
+    // test will catch the regression.
+    //
+    [Fact]
+    public async Task DeleteUser_OnlyCallsDeleteAsync_NeverCallsGetByIdAsync()
+    {
+        // Arrange
+        var existingUser = new User { Id = 1, Username = "user", Email = "user@user.com" };
+        _mockRepo.Setup(repo => repo.DeleteAsync(1, CancellationToken.None))
+            .ReturnsAsync(existingUser);
+
+        // Act — same call as the success test
+        var result = await _mutations.DeleteUser(existingUser.Id, _mockRepo.Object, CancellationToken.None);
+        // Assert
+        _mockRepo.Verify(repo => repo.DeleteAsync(existingUser.Id, CancellationToken.None), Times.Once);
+        _mockRepo.Verify(repo => repo.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     // -------------------------------------------------------------------------
@@ -148,14 +235,14 @@ public class UserMutationTests
     [Fact]
     public async Task RegisterUser_PasswordIsHashed_NotStoredPlaintext()
     {
-        _mockRepo.Setup(r => r.UsernameExistsAsync(It.IsAny<string>(), CancellationToken.None))
+        _mockRepo.Setup(repo => repo.UsernameExistsAsync(It.IsAny<string>(), CancellationToken.None))
             .ReturnsAsync(false);
-        _mockRepo.Setup(r => r.EmailExistsAsync(It.IsAny<string>(), CancellationToken.None))
+        _mockRepo.Setup(repo => repo.EmailExistsAsync(It.IsAny<string>(), CancellationToken.None))
             .ReturnsAsync(false);
 
         User? capturedUser = null;
-        _mockRepo.Setup(r => r.AddAsync(It.IsAny<User>(), CancellationToken.None))
-            .Callback<User>(u => capturedUser = u)  // Capture the entity
+        _mockRepo.Setup(repo => repo.AddAsync(It.IsAny<User>(), CancellationToken.None))
+            .Callback<User>(user => capturedUser = user)  // Capture the entity
             .ReturnsAsync((User u) => u);
 
         var input = new RegisterUserInput("user", "user@test.com", "MySecret");
