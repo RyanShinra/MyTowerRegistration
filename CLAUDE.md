@@ -105,6 +105,66 @@ This project follows standard C# conventions:
 
 ---
 
+### Testing (xUnit + Moq)
+
+**Use `Assert.Collection` instead of `NotNull` + `Single` + `Equal([0])`.**
+`Assert.Collection` implicitly asserts non-null and exact element count via the number of
+lambdas. Name lambda parameters `errorZero`, `errorOne`, etc. so the index mapping is
+explicit — `error =>` is ambiguous, `errorZero =>` is not.
+
+```csharp
+// ✗ Three assertions doing the work of one, index implicit
+Assert.NotNull(result.Errors);
+Assert.Single(result.Errors);
+Assert.Equal(DeleteUserErrorCode.UserNotFound, result.Errors[0].Code);
+
+// ✅ One assertion, index explicit in the parameter name
+Assert.Collection(result.Errors,
+    errorZero => Assert.Equal(DeleteUserErrorCode.UserNotFound, errorZero.Code));
+
+// ✅ Multiple errors — position is unambiguous
+Assert.Collection(result.Errors,
+    errorZero => Assert.Equal(DeleteUserErrorCode.UserNotFound,       errorZero.Code),
+    errorOne  => Assert.Equal(DeleteUserErrorCode.UnauthorizedDeletion, errorOne.Code));
+```
+
+**Use explicit return types (not `var`) for Act results in tests.**
+The return type of the method under test is part of its contract. An explicit type causes
+a compile error if the signature changes; `var` silently adapts and hides the breakage.
+
+```csharp
+RegisterUserPayload result = await _mutations.RegisterUser(...);  // ✅ compile-time contract
+var result = await _mutations.RegisterUser(...);                   // ✗ hides signature changes
+```
+
+**`Assert.Collection` is order-sensitive — decide if order is part of the contract.**
+If error order matters to callers (e.g. primary error is always first), use
+`Assert.Collection` and the order is tested. If order is irrelevant, use
+`Assert.Contains` per error plus an explicit count check:
+
+```csharp
+// ✅ When order is guaranteed
+Assert.Collection(result.Errors,
+    errorZero => Assert.Equal(DeleteUserErrorCode.UserNotFound,        errorZero.Code),
+    errorOne  => Assert.Equal(DeleteUserErrorCode.UnauthorizedDeletion, errorOne.Code));
+
+// ✅ When order is not guaranteed
+Assert.Contains(result.Errors, e => e.Code == DeleteUserErrorCode.UserNotFound);
+Assert.Contains(result.Errors, e => e.Code == DeleteUserErrorCode.UnauthorizedDeletion);
+Assert.Equal(2, result.Errors!.Count); // pin count — Contains alone allows extras
+```
+
+**Use `Assert.Same` to verify object identity, `Assert.Equivalent` for structural equality.**
+`Assert.Equal` on a class without `Equals` overridden is reference equality — same as
+`Assert.Same`. Be explicit about which you mean.
+
+```csharp
+Assert.Same(existingUser, result.User);       // same reference — resolver returned the repo object
+Assert.Equivalent(existingUser, result.User); // field-by-field — different instance, same values
+```
+
+---
+
 ## Architecture Notes
 
 - Raw `HttpClient` GraphQL calls in Blazor pages are **temporary** — StrawberryShake

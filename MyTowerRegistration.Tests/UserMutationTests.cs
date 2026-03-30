@@ -90,9 +90,8 @@ public class UserMutationTests
 
         // Assert
         Assert.Null(result.User);
-        Assert.NotNull(result.Errors);
-        Assert.Single(result.Errors!);
-        Assert.Equal(CreateUserErrorCode.UsernameTaken, result.Errors![0].Code);
+        Assert.Collection(result.Errors,
+            errorZero => Assert.Equal(CreateUserErrorCode.UsernameTaken, errorZero.Code));
 
         // Verify AddAsync was NEVER called (we short-circuited)
         _mockRepo.Verify(repo => repo.AddAsync(It.IsAny<User>(), CancellationToken.None), Times.Never);
@@ -121,9 +120,8 @@ public class UserMutationTests
         // Error returns from GQL land with no user (couldn't create), 
         // and one error of the EmailTaken
         Assert.Null(result.User);
-        Assert.NotNull(result.Errors);
-        Assert.Single(result.Errors);
-        Assert.Equal(CreateUserErrorCode.EmailTaken, result.Errors![0].Code);
+        Assert.Collection(result.Errors,
+            errorZero => Assert.Equal(CreateUserErrorCode.EmailTaken, errorZero.Code));
     }
 
     // -------------------------------------------------------------------------
@@ -143,9 +141,8 @@ public class UserMutationTests
 
         // Similar error pattern, null user, 1 error with correct error code
         Assert.Null(result.User);
-        Assert.NotNull(result.Errors);
-        Assert.Single(result.Errors);
-        Assert.Equal(CreateUserErrorCode.InvalidEmail, result.Errors![0].Code);
+        Assert.Collection(result.Errors,
+            errorZero => Assert.Equal(CreateUserErrorCode.InvalidEmail, errorZero.Code));
 
         // No DB calls should happen for a validation failure
         _mockRepo.Verify(repo => repo.UsernameExistsAsync(It.IsAny<string>(), CancellationToken.None), Times.Never);
@@ -200,9 +197,8 @@ public class UserMutationTests
 
         // Assert — verify result.User is null, result.Errors has one UserNotFound entry
         Assert.Null(result.User);
-        Assert.NotNull(result.Errors);
-        Assert.Single<DeleteUserError>(result.Errors);
-        Assert.Equal(DeleteUserErrorCode.UserNotFound, result.Errors[0].Code);
+        Assert.Collection(result.Errors,
+            errorZero => Assert.Equal(DeleteUserErrorCode.UserNotFound, errorZero.Code));
     }
 
     // -------------------------------------------------------------------------
