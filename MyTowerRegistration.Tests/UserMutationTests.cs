@@ -56,7 +56,7 @@ public class UserMutationTests
         var input = new RegisterUserInput("testuser", "test@example.com", "Password123");
 
         // Act — call the mutation
-        var result = await _mutations.RegisterUser(input, _mockRepo.Object, CancellationToken.None);
+        RegisterUserPayload result = await _mutations.RegisterUser(input, _mockRepo.Object, CancellationToken.None);
 
         // Assert
         Assert.NotNull(result.User);
@@ -86,7 +86,7 @@ public class UserMutationTests
         var input = new RegisterUserInput("taken", "new@example.com", "Password123");
 
         // Act
-        var result = await _mutations.RegisterUser(input, _mockRepo.Object, CancellationToken.None);
+        RegisterUserPayload result = await _mutations.RegisterUser(input, _mockRepo.Object, CancellationToken.None);
 
         // Assert
         Assert.Null(result.User);
@@ -116,7 +116,7 @@ public class UserMutationTests
         // Create a new user, only the email address matters
         var input = new RegisterUserInput("newuser", "taken@example.com", "Password123");
 
-        var result = await _mutations.RegisterUser(input, _mockRepo.Object, CancellationToken.None);
+        RegisterUserPayload result = await _mutations.RegisterUser(input, _mockRepo.Object, CancellationToken.None);
 
         // Error returns from GQL land with no user (couldn't create), 
         // and one error of the EmailTaken
@@ -139,7 +139,7 @@ public class UserMutationTests
 
         // Call the test function
         // (Implicitly, the bad email check should happen and bail out before trying to call into the DB).
-        var result = await _mutations.RegisterUser(input, _mockRepo.Object, CancellationToken.None);
+        RegisterUserPayload result = await _mutations.RegisterUser(input, _mockRepo.Object, CancellationToken.None);
 
         // Similar error pattern, null user, 1 error with correct error code
         Assert.Null(result.User);
@@ -196,7 +196,7 @@ public class UserMutationTests
             .ReturnsAsync((User?)null);
 
         // Act
-        var result = await _mutations.DeleteUser(delUserId, _mockRepo.Object, CancellationToken.None);
+        DeleteUserPayload result = await _mutations.DeleteUser(delUserId, _mockRepo.Object, CancellationToken.None);
 
         // Assert — verify result.User is null, result.Errors has one UserNotFound entry
         Assert.Null(result.User);
@@ -221,7 +221,7 @@ public class UserMutationTests
             .ReturnsAsync(existingUser);
 
         // Act — same call as the success test
-        var result = await _mutations.DeleteUser(existingUser.Id, _mockRepo.Object, CancellationToken.None);
+        DeleteUserPayload result = await _mutations.DeleteUser(existingUser.Id, _mockRepo.Object, CancellationToken.None);
         // Assert: The mutation only called delete once on the DB, it never called the GetById (the old pattern which has the race condition)
         _mockRepo.Verify(repo => repo.DeleteAsync(existingUser.Id, CancellationToken.None), Times.Once);
         _mockRepo.Verify(repo => repo.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
