@@ -97,9 +97,9 @@ else {
     //   - A string? for delete error messages
     private int? deletionId;
     private string? deletionErrorMessage;
-
-    // =============================================================================
-    // LIFECYCLE: OnInitializedAsync
+    // State fields for deletion UX:
+    //   - deletionId: tracks which row's button is currently "in flight" (for disabling it)
+    //   - deletionErrorMessage: holds delete error messages
     //
     // This is the primary lifecycle method for async data fetching in Blazor.
     // It runs once when the component is first added to the render tree.
