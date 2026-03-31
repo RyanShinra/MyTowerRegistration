@@ -104,6 +104,12 @@ DB_USERNAME="postgres"
 # Kestrel binding (http://+:8080) set by the aspnet base image.
 API_PORT=8080
 
+# Health check path for the ALB target group. Stored as a variable rather than
+# a literal string to prevent Git Bash on Windows from converting the leading
+# slash to a Windows path (e.g. C:/Program Files/Git/api/graphql).
+# MSYS_NO_PATHCONV=1 should prevent this, but variable expansion is more reliable.
+HEALTH_CHECK_PATH="/api/graphql"
+
 # CloudWatch log group — all container logs go here, prefixed by "api/" or "migrations/"
 LOG_GROUP="/ecs/mytower-registration"
 
@@ -638,7 +644,7 @@ if [ "${EXISTING_TG_ARN}" = "None" ] || [ -z "${EXISTING_TG_ARN}" ]; then
         --vpc-id "${VPC_ID}" \
         --target-type ip \
         --health-check-protocol HTTP \
-        --health-check-path "/api/graphql" \
+        --health-check-path "${HEALTH_CHECK_PATH}" \
         --health-check-interval-seconds 30 \
         --healthy-threshold-count 2 \
         --unhealthy-threshold-count 3 \
