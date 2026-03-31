@@ -103,6 +103,19 @@ This project follows standard C# conventions:
 - `is null` / `is not null` for null checks (not `== null`)
 - PascalCase for record parameters (they become public properties)
 
+```csharp
+// ✅ File-scoped namespace — one line, no extra indentation
+namespace MyTowerRegistration.API.GraphQL.Types;
+
+public record DeleteUserError(string Message, DeleteUserErrorCode Code);
+
+// ✗ Block-scoped namespace — extra nesting, C-era style
+namespace MyTowerRegistration.API.GraphQL.Types
+{
+    public record DeleteUserError(string Message, DeleteUserErrorCode Code);
+}
+```
+
 ---
 
 ### Testing (xUnit + Moq)
