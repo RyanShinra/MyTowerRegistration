@@ -18,15 +18,18 @@
 #   3.  Builds and pushes Docker images to ECR
 #   4.  Prompts for a DB password and stores it in Secrets Manager
 #   5.  Creates a security group for RDS (locked to ECS traffic only)
-#   6.  Opens port 8080 on the existing ECS security group
+#   6.  Opens port 8080 on the existing ECS security group (tightened in step 12)
 #   7.  Creates an RDS subnet group and the RDS Postgres instance
 #   8.  Updates the secret with the full connection string once RDS is up
 #   9.  Creates a CloudWatch log group for container logs
 #   10. Registers an ECS task definition for migrations
 #   11. Runs migrations as a one-off ECS task and waits for it to finish
-#   12. Registers an ECS task definition for the API
-#   13. Creates an ECS service to keep the API running
-#   14. Prints the public IP of the running task
+#   12. Creates an Application Load Balancer (ALB + target group + listener)
+#       and tightens the ECS security group to only accept traffic from the ALB
+#   13. Builds Blazor WASM, uploads to S3, creates a CloudFront distribution
+#   14. Registers an ECS task definition for the API (with CORS origin set)
+#   15. Creates an ECS service to keep the API running behind the ALB
+#   16. Prints the stable ALB URL and CloudFront admin URL
 #
 # =============================================================================
 
@@ -84,6 +87,14 @@ SECRET_NAME="mytower-registration/db-connection-string"
 MIGRATIONS_TASK_FAMILY="mytower-registration-migrations"
 API_TASK_FAMILY="mytower-registration-api"
 API_SERVICE_NAME="mytower-registration-api"
+
+# Load balancer resource names
+ALB_NAME="mytower-registration-alb"
+ALB_SG_NAME="mytower-registration-alb-sg"
+TG_NAME="mytower-registration-tg"
+
+# S3 bucket for Blazor WASM static files (must be globally unique across all of AWS)
+BLAZOR_BUCKET="mytower-registration-admin"
 
 # Database settings
 DB_NAME="mytower_registration"
@@ -511,7 +522,334 @@ fi
 echo "Migrations completed successfully (exit code 0)"
 
 # =============================================================================
-# STEP 12: Register the API ECS task definition
+# STEP 12: Create Application Load Balancer
+# =============================================================================
+# An ALB gives the API a stable DNS hostname that doesn't change when tasks
+# restart — unlike the raw public IP from the smoke-test phase.
+#
+# Three parts:
+#   1. ALB itself          — receives traffic on port 80
+#   2. Target group        — pool of ECS task IPs that get the traffic
+#   3. Listener            — rule: "port 80 → forward to target group"
+#
+# Security model: we give the ALB its own security group that accepts port 80
+# from the internet, then REMOVE the 0.0.0.0/0 rule on the ECS security group
+# and replace it with "from ALB SG only". The ALB becomes the sole public entry
+# point — ECS tasks are unreachable directly.
+echo ""
+echo "--- Step 12: Creating Application Load Balancer ---"
+
+# VPC_ID was set in step 5, but recapture here so this step is re-runnable
+# in isolation without step 5 having been run in the same shell session.
+VPC_ID=$(aws ec2 describe-security-groups \
+    --group-ids "${ECS_SG_ID}" \
+    --query 'SecurityGroups[0].VpcId' \
+    --output text)
+
+# --- ALB security group: accept HTTP from internet -------------------------
+EXISTING_ALB_SG=$(aws ec2 describe-security-groups \
+    --filters "Name=group-name,Values=${ALB_SG_NAME}" "Name=vpc-id,Values=${VPC_ID}" \
+    --query 'SecurityGroups[0].GroupId' \
+    --output text 2>/dev/null || echo "None")
+
+if [ "${EXISTING_ALB_SG}" = "None" ] || [ -z "${EXISTING_ALB_SG}" ]; then
+    ALB_SG_ID=$(aws ec2 create-security-group \
+        --group-name "${ALB_SG_NAME}" \
+        --description "Allow HTTP from internet to MyTowerRegistration ALB" \
+        --vpc-id "${VPC_ID}" \
+        --query 'GroupId' --output text)
+
+    aws ec2 authorize-security-group-ingress \
+        --group-id "${ALB_SG_ID}" \
+        --protocol tcp --port 80 --cidr "0.0.0.0/0"
+
+    echo "ALB security group created: ${ALB_SG_ID}"
+else
+    ALB_SG_ID="${EXISTING_ALB_SG}"
+    echo "Reusing existing ALB security group: ${ALB_SG_ID}"
+fi
+
+# --- Tighten ECS security group --------------------------------------------
+# Step 6 opened port 8080 from 0.0.0.0/0 (fine for direct-access smoke testing).
+# Now that the ALB is the sole entry point, revoke that open rule and replace it
+# with one that only allows traffic originating from the ALB security group.
+aws ec2 revoke-security-group-ingress \
+    --group-id "${ECS_SG_ID}" \
+    --protocol tcp --port "${API_PORT}" \
+    --cidr "0.0.0.0/0" > /dev/null 2>&1 || true
+
+aws ec2 authorize-security-group-ingress \
+    --group-id "${ECS_SG_ID}" \
+    --protocol tcp \
+    --port "${API_PORT}" \
+    --source-group "${ALB_SG_ID}" > /dev/null 2>&1 || true
+
+echo "ECS security group updated: port ${API_PORT} now only reachable from ALB SG."
+
+# --- Application Load Balancer ---------------------------------------------
+EXISTING_ALB_ARN=$(aws elbv2 describe-load-balancers \
+    --names "${ALB_NAME}" \
+    --query 'LoadBalancers[0].LoadBalancerArn' \
+    --output text 2>/dev/null || echo "None")
+
+if [ "${EXISTING_ALB_ARN}" = "None" ] || [ -z "${EXISTING_ALB_ARN}" ]; then
+    ALB_ARN=$(aws elbv2 create-load-balancer \
+        --name "${ALB_NAME}" \
+        --subnets "${SUBNETS_ARRAY[@]}" \
+        --security-groups "${ALB_SG_ID}" \
+        --scheme internet-facing \
+        --type application \
+        --ip-address-type ipv4 \
+        --query 'LoadBalancers[0].LoadBalancerArn' --output text)
+    echo "ALB created: ${ALB_ARN}"
+else
+    ALB_ARN="${EXISTING_ALB_ARN}"
+    echo "Reusing existing ALB: ${ALB_ARN}"
+fi
+
+ALB_DNS=$(aws elbv2 describe-load-balancers \
+    --load-balancer-arns "${ALB_ARN}" \
+    --query 'LoadBalancers[0].DNSName' --output text)
+echo "ALB DNS: ${ALB_DNS}"
+
+# --- Target group ----------------------------------------------------------
+# We use target-type=ip because Fargate tasks run in awsvpc mode — each task
+# gets its own private IP. The ALB registers task IPs directly, unlike EC2
+# where you'd register instance IDs.
+#
+# Health check: the ALB polls /api/graphql on each task to decide if it's
+# healthy enough to receive traffic. Hot Chocolate returns 200 for GET requests
+# (it serves the Banana Cake Pop UI), making it a reliable probe.
+#
+#   interval-seconds 30       — poll every 30s
+#   healthy-threshold 2       — 2 consecutive 200s → task enters service (~60s)
+#   unhealthy-threshold 3     — 3 consecutive failures → task pulled from rotation (~90s)
+#   matcher "200"             — only HTTP 200 counts as healthy (GraphQL always returns 200)
+EXISTING_TG_ARN=$(aws elbv2 describe-target-groups \
+    --names "${TG_NAME}" \
+    --query 'TargetGroups[0].TargetGroupArn' \
+    --output text 2>/dev/null || echo "None")
+
+if [ "${EXISTING_TG_ARN}" = "None" ] || [ -z "${EXISTING_TG_ARN}" ]; then
+    TG_ARN=$(aws elbv2 create-target-group \
+        --name "${TG_NAME}" \
+        --protocol HTTP \
+        --port "${API_PORT}" \
+        --vpc-id "${VPC_ID}" \
+        --target-type ip \
+        --health-check-protocol HTTP \
+        --health-check-path "/api/graphql" \
+        --health-check-interval-seconds 30 \
+        --healthy-threshold-count 2 \
+        --unhealthy-threshold-count 3 \
+        --matcher '{"HttpCode":"200"}' \
+        --query 'TargetGroups[0].TargetGroupArn' --output text)
+    echo "Target group created: ${TG_ARN}"
+else
+    TG_ARN="${EXISTING_TG_ARN}"
+    echo "Reusing existing target group: ${TG_ARN}"
+fi
+
+# --- Listener --------------------------------------------------------------
+# The listener defines the routing rule attached to the ALB.
+# One rule: all traffic arriving on port 80 is forwarded to our target group.
+EXISTING_LISTENER=$(aws elbv2 describe-listeners \
+    --load-balancer-arn "${ALB_ARN}" \
+    --query 'Listeners[?Port==`80`].ListenerArn' \
+    --output text 2>/dev/null || echo "")
+
+if [ -z "${EXISTING_LISTENER}" ]; then
+    aws elbv2 create-listener \
+        --load-balancer-arn "${ALB_ARN}" \
+        --protocol HTTP \
+        --port 80 \
+        --default-actions "Type=forward,TargetGroupArn=${TG_ARN}" > /dev/null
+    echo "Listener created on port 80."
+else
+    echo "Listener on port 80 already exists, skipping."
+fi
+
+echo "OK"
+
+# =============================================================================
+# STEP 13: Build Blazor WASM and deploy to S3 + CloudFront
+# =============================================================================
+# Blazor WASM compiles to a bundle of static files: HTML, CSS, JS glue code,
+# and .wasm (the compiled .NET runtime + app DLLs). There is no server —
+# the browser downloads everything once, then runs the app locally in WASM.
+#
+# This means we can host it on S3 (pure object storage) and serve it via
+# CloudFront (AWS's CDN). No Fargate task needed for the frontend.
+#
+# SPA routing problem: if a user bookmarks /admin/users, their browser requests
+# that path from S3. S3 returns 404 — no file at that path exists. We configure
+# a CloudFront custom error response: 404 → /index.html (HTTP 200). Blazor's
+# client-side Router then picks up the URL and navigates to the right page.
+# Without this, every deep link produces a blank error page.
+#
+# The Blazor app needs the API URL at publish time — it's baked into
+# wwwroot/appsettings.json, which the browser downloads as a static file.
+# We patch that file with the real ALB DNS before running dotnet publish.
+#
+# The API needs the CloudFront domain for CORS (AllowedOrigins). We get that
+# domain immediately after create-distribution — no need to wait for the
+# 15-minute global propagation — and pass it to the ECS task definition in step 14.
+echo ""
+echo "--- Step 13: Building and deploying Blazor Admin ---"
+
+# --- Patch Blazor's API URL ------------------------------------------------
+ADMIN_APPSETTINGS="./MyTowerRegistration.Admin/wwwroot/appsettings.json"
+
+# Substitute the ALB DNS for the placeholder URL in wwwroot/appsettings.json.
+# This file is downloaded by the browser at startup as plain text — it is NOT
+# a secret. Using jq prevents breakage if the DNS name contains special chars.
+jq --arg url "http://${ALB_DNS}" '.ApiBaseUrl = $url' "${ADMIN_APPSETTINGS}" \
+    > "${ADMIN_APPSETTINGS}.tmp" && mv "${ADMIN_APPSETTINGS}.tmp" "${ADMIN_APPSETTINGS}"
+echo "Patched ApiBaseUrl → http://${ALB_DNS}"
+
+# --- Build and publish -----------------------------------------------------
+# `dotnet publish` compiles the Blazor project in Release configuration.
+# Output lands in ./publish/admin/wwwroot/ — that's the static site root.
+dotnet publish ./MyTowerRegistration.Admin/MyTowerRegistration.Admin.csproj \
+    --configuration Release \
+    --output ./publish/admin
+echo "Blazor publish complete."
+
+# --- S3 bucket -------------------------------------------------------------
+# We block all public access on the bucket — CloudFront fetches objects using
+# an Origin Access Control (OAC), which signs requests with SigV4. The bucket
+# is never exposed to the public internet directly.
+if ! aws s3api head-bucket --bucket "${BLAZOR_BUCKET}" > /dev/null 2>&1; then
+    aws s3api create-bucket \
+        --bucket "${BLAZOR_BUCKET}" \
+        --region "${AWS_REGION}" \
+        --create-bucket-configuration LocationConstraint="${AWS_REGION}"
+
+    aws s3api put-public-access-block \
+        --bucket "${BLAZOR_BUCKET}" \
+        --public-access-block-configuration \
+        "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+
+    echo "S3 bucket created: ${BLAZOR_BUCKET}"
+else
+    echo "Reusing existing S3 bucket: ${BLAZOR_BUCKET}"
+fi
+
+# Sync the published wwwroot to S3. --delete removes stale files from previous
+# deploys (e.g. old versioned .wasm files that were renamed in the new build).
+aws s3 sync ./publish/admin/wwwroot "s3://${BLAZOR_BUCKET}/" --delete
+echo "Files uploaded to s3://${BLAZOR_BUCKET}/"
+
+# --- CloudFront Origin Access Control (OAC) --------------------------------
+# OAC is the modern replacement for the older Origin Access Identity (OAI).
+# It uses IAM SigV4 to sign requests from CloudFront to S3, so S3 can verify
+# that requests are from *our specific* CloudFront distribution — not any random
+# one, and not direct browser requests.
+EXISTING_OAC=$(aws cloudfront list-origin-access-controls \
+    --query "OriginAccessControlList.Items[?Name=='mytower-admin-oac'].Id" \
+    --output text 2>/dev/null || echo "")
+
+if [ -z "${EXISTING_OAC}" ]; then
+    OAC_ID=$(aws cloudfront create-origin-access-control \
+        --origin-access-control-config \
+        "Name=mytower-admin-oac,Description=OAC for MyTowerRegistration Admin S3 bucket,OriginAccessControlOriginType=s3,SigningBehavior=always,SigningProtocol=sigv4" \
+        --query 'OriginAccessControl.Id' --output text)
+    echo "OAC created: ${OAC_ID}"
+else
+    OAC_ID="${EXISTING_OAC}"
+    echo "Reusing existing OAC: ${OAC_ID}"
+fi
+
+# --- CloudFront distribution -----------------------------------------------
+# PriceClass_100 = US, Canada, Europe only — the cheapest tier.
+# The CachePolicyId is AWS's managed "CachingOptimized" policy — it caches
+# aggressively based on Cache-Control headers, which Blazor publish sets correctly.
+EXISTING_CF_ID=$(aws cloudfront list-distributions \
+    --query "DistributionList.Items[?Comment=='MyTowerRegistration Admin'].Id" \
+    --output text 2>/dev/null || echo "")
+
+if [ -z "${EXISTING_CF_ID}" ]; then
+    CF_OUTPUT=$(aws cloudfront create-distribution --distribution-config "$(cat <<EOF
+{
+    "CallerReference": "mytower-admin-$(date +%s)",
+    "Comment": "MyTowerRegistration Admin",
+    "DefaultRootObject": "index.html",
+    "Origins": {
+        "Quantity": 1,
+        "Items": [{
+            "Id": "s3-mytower-admin",
+            "DomainName": "${BLAZOR_BUCKET}.s3.${AWS_REGION}.amazonaws.com",
+            "OriginAccessControlId": "${OAC_ID}",
+            "S3OriginConfig": { "OriginAccessIdentity": "" }
+        }]
+    },
+    "DefaultCacheBehavior": {
+        "TargetOriginId": "s3-mytower-admin",
+        "ViewerProtocolPolicy": "redirect-to-https",
+        "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
+        "AllowedMethods": {
+            "Quantity": 2,
+            "Items": ["HEAD", "GET"],
+            "CachedMethods": { "Quantity": 2, "Items": ["HEAD", "GET"] }
+        }
+    },
+    "CustomErrorResponses": {
+        "Quantity": 1,
+        "Items": [{
+            "ErrorCode": 404,
+            "ResponseCode": "200",
+            "ResponsePagePath": "/index.html",
+            "ErrorCachingMinTTL": 0
+        }]
+    },
+    "Enabled": true,
+    "PriceClass": "PriceClass_100",
+    "HttpVersion": "http2"
+}
+EOF
+    )")
+
+    CF_ID=$(echo "${CF_OUTPUT}" | jq -r '.Distribution.Id')
+    CF_DOMAIN=$(echo "${CF_OUTPUT}" | jq -r '.Distribution.DomainName')
+    echo "CloudFront distribution created: ${CF_ID}"
+else
+    CF_ID="${EXISTING_CF_ID}"
+    CF_DOMAIN=$(aws cloudfront get-distribution \
+        --id "${CF_ID}" \
+        --query 'Distribution.DomainName' --output text)
+    echo "Reusing existing CloudFront distribution: ${CF_ID}"
+fi
+
+echo "CloudFront domain: ${CF_DOMAIN}"
+
+# --- S3 bucket policy ------------------------------------------------------
+# Allow CloudFront (authenticated via OAC/SigV4) to call s3:GetObject.
+# The AWS:SourceArn condition locks this to our distribution specifically —
+# without it, any CloudFront distribution could use this bucket as an origin.
+CF_ARN="arn:aws:cloudfront::${AWS_ACCOUNT_ID}:distribution/${CF_ID}"
+
+aws s3api put-bucket-policy --bucket "${BLAZOR_BUCKET}" --policy "$(jq -n \
+    --arg bucket "${BLAZOR_BUCKET}" \
+    --arg cf_arn "${CF_ARN}" \
+    '{
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Sid": "AllowCloudFrontOAC",
+            "Effect": "Allow",
+            "Principal": {"Service": "cloudfront.amazonaws.com"},
+            "Action": "s3:GetObject",
+            "Resource": ("arn:aws:s3:::" + $bucket + "/*"),
+            "Condition": {"StringEquals": {"AWS:SourceArn": $cf_arn}}
+        }]
+    }')"
+
+echo "S3 bucket policy attached (CloudFront OAC only)."
+echo "Note: the distribution takes ~15 min to propagate globally — CF_DOMAIN is"
+echo "available immediately and used for CORS config in step 14."
+echo "OK"
+
+# =============================================================================
+# STEP 14: Register the API ECS task definition
 # =============================================================================
 # The API task definition is similar to migrations but:
 #   - Uses the runtime image (not migrations)
@@ -523,8 +861,14 @@ echo "Migrations completed successfully (exit code 0)"
 # The `secrets` block here works the same way as in step 10 — the value is
 # fetched from Secrets Manager at container startup and injected as an env var.
 echo ""
-echo "--- Step 12: Registering API task definition ---"
+echo "--- Step 14: Registering API task definition ---"
 
+# AllowedOrigins__0 injects the CORS allowed origin as an environment variable.
+# ASP.NET Core reads environment variables as configuration using double underscore
+# as a nesting separator: AllowedOrigins__0 → AllowedOrigins[0] in the config tree.
+# This matches exactly what Program.cs reads via GetSection("AllowedOrigins").Get<string[]>().
+# Using an env var instead of baking the value into appsettings.json means we can
+# update CORS origins by redeploying the task definition — no Docker image rebuild needed.
 aws ecs register-task-definition --cli-input-json "$(cat <<EOF
 {
     "family": "${API_TASK_FAMILY}",
@@ -540,6 +884,10 @@ aws ecs register-task-definition --cli-input-json "$(cat <<EOF
         "portMappings": [{
             "containerPort": ${API_PORT},
             "protocol": "tcp"
+        }],
+        "environment": [{
+            "name": "AllowedOrigins__0",
+            "value": "https://${CF_DOMAIN}"
         }],
         "secrets": [{
             "name": "ConnectionStrings__DefaultConnection",
@@ -561,23 +909,31 @@ EOF
 echo "OK"
 
 # =============================================================================
-# STEP 13: Create ECS service
+# STEP 15: Create ECS service
 # =============================================================================
 # A service keeps desiredCount tasks running at all times. If a task crashes,
 # ECS automatically launches a replacement. This is the key difference from
 # `run-task` (step 11) which ran once and exited.
 #
-# For this first deployment we use a single task in a public subnet with a
-# public IP — no load balancer. The IP will change if the task restarts,
-# but it's sufficient for smoke testing.
+# With a load balancer attached, the service registers each task's private IP
+# with the target group at startup and deregisters it on shutdown. The ALB
+# health check (configured in step 12) gates whether a task receives traffic.
 #
-# `aws ecs wait services-stable` polls until the service reaches steady state
-# (at least 1 running task that passes health checks).
+# IMPORTANT: ECS does not allow changing the load balancer config of an existing
+# service — it must be set at creation. If the service was previously created
+# without a load balancer (e.g. from an earlier smoke-test run of this script),
+# you'll need to delete it manually before re-running:
+#   aws ecs update-service --cluster mytower-cluster --service mytower-registration-api --desired-count 0
+#   aws ecs delete-service --cluster mytower-cluster --service mytower-registration-api
+#
+# health-check-grace-period-seconds: gives the task time to start before the
+# ALB starts evaluating health. Without this, ALB may mark the task unhealthy
+# before ASP.NET Core has finished startup, causing an immediate replacement loop.
 echo ""
-echo "--- Step 13: Creating ECS service ---"
+echo "--- Step 15: Creating ECS service ---"
 
-# Idempotent: update the existing service's task definition if it already exists,
-# otherwise create it fresh. Both paths end with one running task.
+# Idempotent: update task definition if service already exists (with LB),
+# otherwise create it fresh with the load balancer attached.
 EXISTING_SERVICE=$(aws ecs describe-services \
     --cluster "${ECS_CLUSTER}" \
     --services "${API_SERVICE_NAME}" \
@@ -591,7 +947,9 @@ if [ -z "${EXISTING_SERVICE}" ]; then
         --task-definition "${API_TASK_FAMILY}" \
         --desired-count 1 \
         --launch-type FARGATE \
-        --network-configuration "awsvpcConfiguration={subnets=[${SUBNETS_ARRAY[0]}],securityGroups=[${ECS_SG_ID}],assignPublicIp=ENABLED}" > /dev/null
+        --network-configuration "awsvpcConfiguration={subnets=[${SUBNETS_ARRAY[0]}],securityGroups=[${ECS_SG_ID}],assignPublicIp=ENABLED}" \
+        --load-balancers "targetGroupArn=${TG_ARN},containerName=api,containerPort=${API_PORT}" \
+        --health-check-grace-period-seconds 60 > /dev/null
 else
     echo "Service already exists, updating task definition..."
     aws ecs update-service \
@@ -610,34 +968,17 @@ aws ecs wait services-stable \
 echo "OK"
 
 # =============================================================================
-# DONE — discover and print the public IP
+# DONE
 # =============================================================================
-# The running task's public IP is assigned to its elastic network interface (ENI).
-# We chain three describe calls to find it:
-#   list-tasks → task ARN
-#   describe-tasks → ENI ID (from the task's network attachment)
-#   describe-network-interfaces → public IP of the ENI
 echo ""
 echo "=== Deployment complete! ==="
-
-TASK_ARN=$(aws ecs list-tasks \
-    --cluster "${ECS_CLUSTER}" \
-    --service-name "${API_SERVICE_NAME}" \
-    --query 'taskArns[0]' --output text)
-
-ENI_ID=$(aws ecs describe-tasks \
-    --cluster "${ECS_CLUSTER}" \
-    --tasks "${TASK_ARN}" \
-    --query 'tasks[0].attachments[0].details[?name==`networkInterfaceId`].value' \
-    --output text)
-
-PUBLIC_IP=$(aws ec2 describe-network-interfaces \
-    --network-interface-ids "${ENI_ID}" \
-    --query 'NetworkInterfaces[0].Association.PublicIp' \
-    --output text)
-
 echo ""
-echo "  GraphQL playground: http://${PUBLIC_IP}:${API_PORT}/api/graphql"
-echo "  CloudWatch logs:    https://${AWS_REGION}.console.aws.amazon.com/cloudwatch/home?region=${AWS_REGION}#logsV2:log-groups/log-group/${LOG_GROUP//\//%2F}"
+echo "  API (via ALB):       http://${ALB_DNS}/api/graphql"
+echo "  Admin UI:            https://${CF_DOMAIN}"
+echo "  CloudWatch logs:     https://${AWS_REGION}.console.aws.amazon.com/cloudwatch/home?region=${AWS_REGION}#logsV2:log-groups/log-group/${LOG_GROUP//\//%2F}"
 echo ""
-echo "Note: The public IP changes if the task restarts. A load balancer gives a stable endpoint."
+echo "Notes:"
+echo "  - ALB DNS is stable — it doesn't change when tasks restart."
+echo "  - CloudFront is propagating globally (~15 min). The admin URL may return"
+echo "    errors until propagation completes."
+echo "  - CORS is configured: the API allows requests from https://${CF_DOMAIN}"
