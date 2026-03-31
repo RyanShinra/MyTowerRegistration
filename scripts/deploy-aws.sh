@@ -637,18 +637,28 @@ EXISTING_TG_ARN=$(aws elbv2 describe-target-groups \
     --output text 2>/dev/null || echo "None")
 
 if [ "${EXISTING_TG_ARN}" = "None" ] || [ -z "${EXISTING_TG_ARN}" ]; then
+    # Use --cli-input-json + heredoc to avoid Git Bash path conversion.
+    # Git Bash converts arguments that look like Unix paths (e.g. /api/graphql →
+    # C:/Program Files/Git/api/graphql) even when the value comes from a variable.
+    # JSON strings inside a heredoc are passed as a single string token and are
+    # immune to this conversion — the same reason we use heredocs for task defs.
     TG_ARN=$(aws elbv2 create-target-group \
-        --name "${TG_NAME}" \
-        --protocol HTTP \
-        --port "${API_PORT}" \
-        --vpc-id "${VPC_ID}" \
-        --target-type ip \
-        --health-check-protocol HTTP \
-        --health-check-path "${HEALTH_CHECK_PATH}" \
-        --health-check-interval-seconds 30 \
-        --healthy-threshold-count 2 \
-        --unhealthy-threshold-count 3 \
-        --matcher '{"HttpCode":"200"}' \
+        --cli-input-json "$(cat <<EOF
+{
+    "Name": "${TG_NAME}",
+    "Protocol": "HTTP",
+    "Port": ${API_PORT},
+    "VpcId": "${VPC_ID}",
+    "TargetType": "ip",
+    "HealthCheckProtocol": "HTTP",
+    "HealthCheckPath": "${HEALTH_CHECK_PATH}",
+    "HealthCheckIntervalSeconds": 30,
+    "HealthyThresholdCount": 2,
+    "UnhealthyThresholdCount": 3,
+    "Matcher": { "HttpCode": "200" }
+}
+EOF
+        )" \
         --query 'TargetGroups[0].TargetGroupArn' --output text)
     echo "Target group created: ${TG_ARN}"
 else
