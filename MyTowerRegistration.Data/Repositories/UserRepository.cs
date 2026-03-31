@@ -121,7 +121,19 @@ public class UserRepository : IUserRepository
         if (deleteTgt is null) return null;
 
         _context.Users.Remove(deleteTgt);
-        await _context.SaveChangesAsync(ct);
-        return deleteTgt;
+
+        try
+        {
+            await _context.SaveChangesAsync(ct);
+            return deleteTgt;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Another request deleted this row between our FindAsync and SaveChangesAsync.
+            // EF expected 1 row affected; got 0. Detach the entity so the change tracker
+            // doesn't hold stale state, then return null to match the "user not found" contract.
+            _context.Entry(deleteTgt).State = EntityState.Detached;
+            return null;
+        }
     }
 }
