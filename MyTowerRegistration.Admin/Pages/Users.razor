@@ -244,9 +244,14 @@ else {
     private record UserDto(int Id, string Username, string Email, DateTime CreatedAt);
     private record UsersData(List<UserDto> Users);
 
-    // TODO: Add DTOs for the deleteUser response payload
-    private record DeleteUserError(string Message, string Code); // Code is actually an enum, but we're using a string since this is all a placeholder for now
-    private record DeleteUserPayload(UserDto? User, List<DeleteUserError>? Errors);
+    // Temporary DTOs for the deleteUser response — replaced by SS-generated types once codegen runs.
+    // DeletedUserDto is intentionally minimal: the delete mutation only selects { id username }
+    // because we don't need email/createdAt to remove the row from the local list. Reusing the
+    // full UserDto would leave Email and CreatedAt as null/default, which is misleading.
+    // SS will generate a correctly-scoped type from the selection set automatically.
+    private record DeletedUserDto(int Id, string Username);
+    private record DeleteUserError(string Message, string Code); // Code is an enum server-side; string here until SS generates the enum
+    private record DeleteUserPayload(DeletedUserDto? User, List<DeleteUserError>? Errors);
     private record DeleteUserData(DeleteUserPayload DeleteUser);
     // GraphQLResponse<T> and GraphQLError live in GraphQL/Models/GraphQLResponse.cs
 }
