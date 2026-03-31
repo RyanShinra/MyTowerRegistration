@@ -245,3 +245,8 @@ dotnet_naming_style.begins_with_i.required_prefix = I
 dotnet_naming_style.begins_with_i.required_suffix = 
 dotnet_naming_style.begins_with_i.word_separator = 
 dotnet_naming_style.begins_with_i.capitalization = pascal_case
+
+[*.razor]
+end_of_line = lf
+insert_final_newline = true
+dotnet_style_allow_multiple_blank_lines_experimental = false

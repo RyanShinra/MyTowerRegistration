@@ -26,7 +26,7 @@ using MyTowerRegistration.Data.Repositories;
 using System.Security.Cryptography;
 using System.Text;
 
-using UEC = MyTowerRegistration.API.GraphQL.Types.UserErrorCode;
+using UEC = MyTowerRegistration.API.GraphQL.Types.CreateUserErrorCode;
 using RPayload = MyTowerRegistration.API.GraphQL.Types.RegisterUserPayload;
 namespace MyTowerRegistration.API.GraphQL.Mutations;
 
@@ -45,7 +45,7 @@ public class UserMutations
     //   {
     //       // Step A: Validate email format
     //       //   - Use a simple check or System.Net.Mail.MailAddress.TryCreate()
-    //       //   - If invalid, return: new RegisterUserPayload(null, [new UserError(...)])
+    //       //   - If invalid, return: new RegisterUserPayload(null, [new CreateUserError(...)])
     //       //   - Error code: "INVALID_EMAIL"
     //
     //       // Step B: Check if username is taken
@@ -83,7 +83,7 @@ public class UserMutations
         CancellationToken ct)
     {
         RPayload ErrorPayload(string message, UEC code)
-            => new(null, [new UserError(message, code)]);
+            => new(null, [new CreateUserError(message, code)]);
 
         bool TryCreateEmail() => System.Net.Mail.MailAddress.TryCreate(input.Email, out _);
 
@@ -95,10 +95,8 @@ public class UserMutations
             if (input.Username.Length < 3 || input.Username.Length > 20)
                 return ErrorPayload("Username must be between 3 and 20 characters", UEC.InvalidUsername);
 
-            return null; 
+            return null;
         }
-            
-        
 
         RPayload? ValidateEmail() => !TryCreateEmail()
             ? ErrorPayload("Invalid e-mail address", UEC.InvalidEmail) 
@@ -145,5 +143,14 @@ public class UserMutations
         byte[] pwBytes = Encoding.UTF8.GetBytes(password);
         var hashBytes = SHA256.HashData(pwBytes);
         return Convert.ToHexString(hashBytes).ToLowerInvariant();
+    }
+
+    public async Task<DeleteUserPayload> DeleteUser(int id, [Service] IUserRepository userRepository, CancellationToken ct)
+    {
+        User? justDeleted = await userRepository.DeleteAsync(id, ct);
+        if (justDeleted is null) {
+            return new DeleteUserPayload(null, [new DeleteUserError("User Not Found", DeleteUserErrorCode.UserNotFound)]);
+        }
+        return new DeleteUserPayload(justDeleted, null);
     }
 }

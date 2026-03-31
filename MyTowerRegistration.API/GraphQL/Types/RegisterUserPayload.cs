@@ -7,7 +7,7 @@
 //
 //   type RegisterUserPayload {
 //     user: User          ← null if registration failed
-//     errors: [UserError!] ← null/empty if registration succeeded
+//     errors: [CreateUserError!] ← null/empty if registration succeeded
 //   }
 //
 // This is better than throwing exceptions because:
@@ -16,7 +16,7 @@
 //   3. The schema documents all possible errors
 //
 // Compare to Apollo Server:
-//   In TS you might return { user?: User; errors?: UserError[] }
+//   In TS you might return { user?: User; errors?: CreateUserError[] }
 //   Same idea, but Hot Chocolate enforces the convention structurally.
 // =============================================================================
 
@@ -24,4 +24,4 @@ using MyTowerRegistration.Data.Models;
 
 namespace MyTowerRegistration.API.GraphQL.Types;
 
-public record RegisterUserPayload(User? User, IReadOnlyList<UserError>? Errors);
+public record RegisterUserPayload(User? User, IReadOnlyList<CreateUserError>? Errors);

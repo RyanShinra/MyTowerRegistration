@@ -51,4 +51,10 @@ public interface IUserRepository
     // TODO 6: Task<bool> EmailExistsAsync(string email)
     //   - Same pattern as UsernameExistsAsync
     Task<bool> EmailExistsAsync(string email, CancellationToken ct);
+
+    // Returns the deleted User if found and deleted, or null if no such user existed.
+    // Returning User? (rather than bool) lets the caller include the deleted entity
+    // in the response payload without a separate GetByIdAsync call — which would
+    // introduce a TOCTOU (= Time Of Check, Time Of Use) race if another request deleted the same row in between.
+    Task<User?> DeleteAsync(int id, CancellationToken ct);
 }
