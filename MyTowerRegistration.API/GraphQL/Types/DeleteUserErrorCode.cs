@@ -1,10 +1,9 @@
-﻿namespace MyTowerRegistration.API.GraphQL.Types
+﻿namespace MyTowerRegistration.API.GraphQL.Types;
+
+public enum DeleteUserErrorCode
 {
-    public enum DeleteUserErrorCode
-    {
-        UserNotFound,
-        UnauthorizedAccess,
-        UnauthorizedDeletion,
-        Unknown
-    }
+    UserNotFound,
+    UnauthorizedAccess,
+    UnauthorizedDeletion,
+    Unknown
 }
