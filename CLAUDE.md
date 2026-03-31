@@ -154,6 +154,29 @@ Assert.Contains(result.Errors, e => e.Code == DeleteUserErrorCode.UnauthorizedDe
 Assert.Equal(2, result.Errors!.Count); // pin count — Contains alone allows extras
 ```
 
+**Use descriptive lambda parameter names in Moq Setup/Verify.**
+`r =>` is ambiguous when the method under test has a similar name. Use the interface
+concept as the name so the stub reads as a sentence.
+
+```csharp
+_mockRepo.Setup(repo => repo.DeleteAsync(...))  // ✅ "on the repo, when DeleteAsync is called"
+_mockRepo.Setup(r => r.DeleteAsync(...))        // ✗ what is r?
+```
+
+**Use `const` for test data values shared between Arrange and Assert.**
+Magic numbers repeated in both sections invite typos and produce unreadable failure messages.
+
+```csharp
+// ✅
+const int testUserId = 42;
+_mockRepo.Setup(repo => repo.DeleteAsync(testUserId, ...)).ReturnsAsync(existingUser);
+Assert.Equal(testUserId, result.User!.Id);
+
+// ✗ same value in two places — easy to mismatch silently
+_mockRepo.Setup(repo => repo.DeleteAsync(42, ...)).ReturnsAsync(existingUser);
+Assert.Equal(42, result.User!.Id);
+```
+
 **Use `Assert.Same` to verify object identity, `Assert.Equivalent` for structural equality.**
 `Assert.Equal` on a class without `Equals` overridden is reference equality — same as
 `Assert.Same`. Be explicit about which you mean.
@@ -174,3 +197,10 @@ Assert.Equivalent(existingUser, result.User); // field-by-field — different in
   them as part of cleanup.
 - `schema.graphql` is auto-exported by an MSBuild `AfterBuild` target (Debug only).
   Do not hand-edit it.
+- Payload `Errors` lists support multiple errors by design, but current resolvers only
+  produce one error per failure path. When multi-error cases are added: order is
+  best-effort (most important first) but not guaranteed — tests and clients must use
+  `Assert.Contains` + count check rather than `Assert.Collection` for those cases.
+  Longer term, each resolver should declare its own error type rather than sharing
+  across resolvers, to make the possible error set explicit at the type level (tracked
+  in a future issue).
