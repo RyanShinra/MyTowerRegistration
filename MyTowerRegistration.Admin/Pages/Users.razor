@@ -62,7 +62,7 @@ else {
                                 @onclick="() => HandleDelete(user.Id)"
                                 @disabled="@(deletionId is not null)"
                         >
-                            @(deletionId == user.Id ?  "⏳" : "Delete")
+                            @(deletionId == user.Id ?  "⏳ Deleting..." : "Delete")
                         </button>
                     </td>
                 </tr>
@@ -76,9 +76,6 @@ else {
 }
 
 @code {
-
-
-
     // =============================================================================
     // COMPONENT STATE
     //
@@ -94,8 +91,6 @@ else {
     private bool isLoading = true;
     private string? errorMessage;
     private List<UserDto> users = new();
-
-
 
     // TODO: Add state fields for deletion:
     //   - An int? to track which row's button is currently "in flight" (for disabling it)
