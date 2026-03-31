@@ -103,6 +103,44 @@ builder.Services
     .AddDataLoader<UserBatchDataLoader>();
 
 
+// --- CORS ------------------------------------------------------------------
+// CORS (Cross-Origin Resource Sharing) is a browser security mechanism.
+// When the Blazor Admin app (e.g. https://xxx.cloudfront.net) calls this API
+// (https://alb-dns/api/graphql), the browser considers it a cross-origin
+// request and blocks it by default. We opt in by declaring which origins are
+// allowed.
+//
+// The allowed origins come from configuration so they can differ per environment
+// without code changes:
+//   - Dev: appsettings.Development.json → localhost ports
+//   - Prod: AllowedOrigins__0 env var in ECS task definition → CloudFront URL
+//
+// AllowAnyHeader/AllowAnyMethod: GraphQL uses Content-Type: application/json
+// and POST, both standard — permitting all headers/methods is fine here.
+//
+// IMPORTANT: UseCors("AdminPolicy") must be called BEFORE MapGraphQL() in the
+// middleware pipeline below. The browser sends a preflight OPTIONS request
+// before the real POST — UseCors handles that response.
+string[] allowedOrigins = builder.Configuration
+    .GetSection("AllowedOrigins")
+    .Get<string[]>() ?? [];
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AdminPolicy", policy =>
+    {
+        if (allowedOrigins.Length > 0)
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        }
+        // If AllowedOrigins is empty (e.g. no env var set in ECS yet), the
+        // policy allows nothing — no CORS headers are emitted, browser blocks
+        // cross-origin calls. Safe default: no frontend configured, no access.
+    });
+});
+
 // Keep OpenAPI support from the template
 builder.Services.AddOpenApi();
 
@@ -140,6 +178,10 @@ if (app.Environment.IsDevelopment())
 //
 //   Compare to Apollo: app.use('/graphql', expressMiddleware(server));
 //   Default path is /graphql. Customize with: app.MapGraphQL("/api/graphql");
+// Apply the CORS policy before mapping endpoints. The browser sends a preflight
+// OPTIONS request before the real POST — UseCors handles that response.
+app.UseCors("AdminPolicy");
+
 app.MapGraphQL("/api/graphql");
 
 app.Run();
