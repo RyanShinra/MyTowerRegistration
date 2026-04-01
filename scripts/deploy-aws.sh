@@ -112,7 +112,7 @@ API_PORT=8080
 # a literal string to prevent Git Bash on Windows from converting the leading
 # slash to a Windows path (e.g. C:/Program Files/Git/api/graphql).
 # MSYS_NO_PATHCONV=1 should prevent this, but variable expansion is more reliable.
-HEALTH_CHECK_PATH="/api/graphql"
+HEALTH_CHECK_PATH="/api/graphql/"
 
 # CloudWatch log group — all container logs go here, prefixed by "api/" or "migrations/"
 LOG_GROUP="/ecs/mytower-registration"
