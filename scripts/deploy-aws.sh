@@ -220,29 +220,47 @@ echo "OK"
 # changing the secret name.
 echo ""
 echo "--- Step 4: Storing DB password in Secrets Manager ---"
-echo -n "Choose a password for the RDS Postgres database: "
-read -r DB_PASSWORD
-echo ""
 
-# We store a placeholder now and update with the full connection string in step 8,
-# once we know the RDS endpoint. The secret ARN is captured for later use.
-# If the secret already exists (re-run), we reuse it rather than failing.
-if SECRET_ARN=$(aws secretsmanager describe-secret \
+# If the secret already exists with a real connection string (not "placeholder"),
+# skip the password prompt — the connection string is already correct from a
+# previous successful run. Set SKIP_SECRET_UPDATE=true so Step 8 also skips.
+SKIP_SECRET_UPDATE=false
+
+EXISTING_CS=$(aws secretsmanager get-secret-value \
     --secret-id "${SECRET_NAME}" \
-    --query 'ARN' --output text 2>/dev/null); then
-    echo "Secret already exists, reusing: ${SECRET_ARN}"
-    aws secretsmanager put-secret-value \
-        --secret-id "${SECRET_NAME}" \
-        --secret-string "{\"connectionString\":\"placeholder\"}" > /dev/null
-else
-    SECRET_ARN=$(aws secretsmanager create-secret \
-        --name "${SECRET_NAME}" \
-        --description "DB connection string for MyTowerRegistration API" \
-        --secret-string "{\"connectionString\":\"placeholder\"}" \
-        --query 'ARN' --output text)
-fi
+    --query 'SecretString' --output text 2>/dev/null \
+    | jq -r '.connectionString // empty' 2>/dev/null || echo "")
 
-echo "Secret ARN: ${SECRET_ARN}"
+if [ -n "${EXISTING_CS}" ] && [ "${EXISTING_CS}" != "placeholder" ]; then
+    SECRET_ARN=$(aws secretsmanager describe-secret \
+        --secret-id "${SECRET_NAME}" \
+        --query 'ARN' --output text)
+    SKIP_SECRET_UPDATE=true
+    echo "Connection string already set in Secrets Manager, skipping password prompt."
+    echo "Secret ARN: ${SECRET_ARN}"
+else
+    echo -n "Enter the RDS Postgres password: "
+    read -r DB_PASSWORD
+    echo ""
+
+    # Store a placeholder now — Step 8 fills in the real connection string once
+    # we know the RDS endpoint. The secret ARN is captured for use in task defs.
+    if SECRET_ARN=$(aws secretsmanager describe-secret \
+        --secret-id "${SECRET_NAME}" \
+        --query 'ARN' --output text 2>/dev/null); then
+        echo "Secret already exists, reusing: ${SECRET_ARN}"
+        aws secretsmanager put-secret-value \
+            --secret-id "${SECRET_NAME}" \
+            --secret-string "{\"connectionString\":\"placeholder\"}" > /dev/null
+    else
+        SECRET_ARN=$(aws secretsmanager create-secret \
+            --name "${SECRET_NAME}" \
+            --description "DB connection string for MyTowerRegistration API" \
+            --secret-string "{\"connectionString\":\"placeholder\"}" \
+            --query 'ARN' --output text)
+    fi
+    echo "Secret ARN: ${SECRET_ARN}"
+fi
 
 # =============================================================================
 # STEP 5: Create a security group for RDS
@@ -384,21 +402,30 @@ echo "RDS ready: ${RDS_ENDPOINT}"
 echo ""
 echo "--- Step 8: Updating secret with full connection string ---"
 
-# Trust Server Certificate=true skips RDS CA chain validation. Traffic is still
-# encrypted in transit, but the server certificate isn't verified against a
-# trusted CA — meaning a MITM inside the VPC could theoretically intercept it.
-# This is acceptable for a first deployment; the proper fix is to ship the AWS
-# RDS CA bundle in the container image and switch to SSL Mode=VerifyFull.
-# See: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html
-CONNECTION_STRING="Host=${RDS_ENDPOINT};Port=5432;Database=${DB_NAME};Username=${DB_USERNAME};Password=${DB_PASSWORD};SSL Mode=Require;Trust Server Certificate=true"
+if [ "${SKIP_SECRET_UPDATE}" = "true" ]; then
+    echo "Skipping — connection string already set in Secrets Manager."
+else
+    # Trust Server Certificate=true skips RDS CA chain validation. Traffic is still
+    # encrypted in transit, but the server certificate isn't verified against a
+    # trusted CA — meaning a MITM inside the VPC could theoretically intercept it.
+    # This is acceptable for a first deployment; the proper fix is to ship the AWS
+    # RDS CA bundle in the container image and switch to SSL Mode=VerifyFull.
+    # See: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html
+    CONNECTION_STRING="Host=${RDS_ENDPOINT};Port=5432;Database=${DB_NAME};Username=${DB_USERNAME};Password=${DB_PASSWORD};SSL Mode=Require;Trust Server Certificate=true"
 
-# Use jq to build the JSON — direct string interpolation would break if the
-# password contains quotes, backslashes, or other special characters.
-SECRET_JSON=$(jq -n --arg cs "${CONNECTION_STRING}" '{connectionString:$cs}')
+    # Use jq to build the JSON — direct string interpolation would break if the
+    # password contains quotes, backslashes, or other special characters.
+    SECRET_JSON=$(jq -n --arg cs "${CONNECTION_STRING}" '{connectionString:$cs}')
 
-aws secretsmanager update-secret \
-    --secret-id "${SECRET_NAME}" \
-    --secret-string "${SECRET_JSON}"
+    aws secretsmanager update-secret \
+        --secret-id "${SECRET_NAME}" \
+        --secret-string "${SECRET_JSON}"
+
+    # Clear sensitive values from memory
+    unset DB_PASSWORD
+    unset CONNECTION_STRING
+    unset SECRET_JSON
+fi
 
 # Clear all sensitive values from memory — CONNECTION_STRING and SECRET_JSON
 # both contain the plaintext password, so unset them along with DB_PASSWORD.
