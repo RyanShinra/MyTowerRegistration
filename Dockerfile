@@ -11,6 +11,7 @@ COPY MyTowerRegistration.sln .
 COPY MyTowerRegistration.API/MyTowerRegistration.API.csproj MyTowerRegistration.API/
 COPY MyTowerRegistration.Data/MyTowerRegistration.Data.csproj MyTowerRegistration.Data/
 COPY MyTowerRegistration.Tests/MyTowerRegistration.Tests.csproj MyTowerRegistration.Tests/
+COPY MyTowerRegistration.Admin/MyTowerRegistration.Admin.csproj MyTowerRegistration.Admin/
 
 RUN dotnet restore
 
