@@ -45,7 +45,23 @@ public class UserRepository : IUserRepository
     //   - FindAsync checks the local cache first, then hits the DB if needed
     public async Task<User?> GetByIdAsync(int id, CancellationToken ct)
     {
-        return await _context.Users.FindAsync(id, ct);
+        // GOTCHA: FindAsync([id], ct) — the square brackets are required, not style.
+        //
+        // FindAsync has two overloads:
+        //   (a) FindAsync(params object?[]  keyValues)          ← the trap
+        //   (b) FindAsync(object?[] keyValues, CancellationToken ct)  ← what we want
+        //
+        // Writing FindAsync(id, ct) looks correct but silently picks overload (a):
+        // the compiler can't match an int to object?[] for overload (b)'s first
+        // parameter, so it falls back to params and boxes both id AND ct into the
+        // key-values array. EF Core then searches for an entity whose primary key
+        // equals [id, ct] — finds nothing — and returns null with no error.
+        //
+        // The fix is the collection expression [id], which produces an object?[]
+        // and satisfies overload (b)'s first parameter, letting ct bind correctly.
+        // Alternatively: FirstOrDefaultAsync(u => u.Id == id, ct) sidesteps this
+        // entirely and is what most experienced EF Core devs reach for instead.
+        return await _context.Users.FindAsync([id], ct);
     }
 
     // TODO 4: Implement GetAllAsync()
@@ -97,5 +113,27 @@ public class UserRepository : IUserRepository
     public async Task<bool> EmailExistsAsync(string searchEmail, CancellationToken ct)
     {
         return await _context.Users.AnyAsync(user => user.Email == searchEmail, ct);
+    }
+
+    public async Task<User?> DeleteAsync(int id, CancellationToken ct)
+    {
+        User? deleteTgt = await _context.Users.FindAsync([id], ct); // [id] not id — see GetByIdAsync for the full explanation
+        if (deleteTgt is null) return null;
+
+        _context.Users.Remove(deleteTgt);
+
+        try
+        {
+            await _context.SaveChangesAsync(ct);
+            return deleteTgt;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Another request deleted this row between our FindAsync and SaveChangesAsync.
+            // EF expected 1 row affected; got 0. Detach the entity so the change tracker
+            // doesn't hold stale state, then return null to match the "user not found" contract.
+            _context.Entry(deleteTgt).State = EntityState.Detached;
+            return null;
+        }
     }
 }

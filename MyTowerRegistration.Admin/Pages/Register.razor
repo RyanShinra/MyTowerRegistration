@@ -1,0 +1,221 @@
+@* =============================================================================
+   REGISTER.RAZOR — New User Registration Form
+
+   IMPLEMENT SECOND — Wire up the RegisterUser mutation.
+
+   Blazor forms use EditForm (not plain HTML <form>) to get:
+     - Two-way data binding via @bind
+     - Built-in validation via DataAnnotationsValidator
+     - Structured submit handling via OnValidSubmit / OnInvalidSubmit
+
+   The model bound to the form is a plain C# class (RegisterForm below).
+   Data annotations on that class drive validation — same attributes you'd
+   use on an EF Core entity or an ASP.NET MVC model.
+
+   Compare to React: controlled components with useState for each field,
+   or a form library like React Hook Form. Blazor's EditForm is closer to
+   the latter — it manages field state and validation in one place.
+   ============================================================================= *@
+
+@page "/register"
+@inject HttpClient Http
+@* NavigationManager used to redirect to /users after successful registration *@
+@inject NavigationManager Nav
+
+<PageTitle>Register User — MyTower Admin</PageTitle>
+
+@* TODO: Replace HttpClient with StrawberryShake typed client:
+   @inject IMyTowerClient Client *@
+
+<h1>Register User</h1>
+
+@if (successMessage is not null)
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+
+@if (errorMessage is not null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@* EditForm replaces plain <form>. It:
+   - Binds to a model object (the form field values)
+   - Manages validation state for each field
+   - Routes submission to OnValidSubmit (only fires if validation passes)
+     or OnInvalidSubmit (fires if validation fails)
+*@
+<EditForm Model="formModel" OnValidSubmit="HandleSubmit">
+    @* DataAnnotationsValidator reads [Required], [EmailAddress], [MinLength] etc.
+       from the model class and runs client-side validation on submit. *@
+    <DataAnnotationsValidator />
+
+    @* ValidationSummary renders a <ul> of all validation errors.
+       Alternatively, use <ValidationMessage For="@(() => formModel.Username)" />
+       next to individual fields for inline errors. *@
+    <ValidationSummary />
+
+    <div class="mb-3">
+        <label for="username" class="form-label text-center">User Name</label>
+        @* @bind="formModel.Username" sets up two-way binding:
+           - Input changes update formModel.Username
+           - formModel.Username changes update the input value
+           Compare to React: value={formModel.username} onChange={e => setUsername(e.target.value)} *@
+        <InputText id="username" class="form-control" @bind-Value="formModel.Username" />
+    </div>
+
+    <div class="mb-3">
+        <label for="email" class="form-label">Email</label>
+        <InputText id="email" class="form-control" @bind-Value="formModel.Email" />
+    </div>
+
+    <div class="mb-3">
+        <label for="password" class="form-label">Password</label>
+        <InputText id="password" type="password" class="form-control" @bind-Value="formModel.Password" />
+    </div>
+
+    <button type="submit" class="btn btn-success" disabled="@isSubmitting">
+        @(isSubmitting ? "Registering..." : "Register")
+    </button>
+</EditForm>
+
+@code {
+    // The form model — EditForm binds to this object.
+    // Data annotations here drive the DataAnnotationsValidator above.
+    // This is the Blazor equivalent of a React form's state object.
+    private RegisterForm formModel = new();
+
+    private bool isSubmitting;
+    private string? successMessage;
+    private string? errorMessage;
+
+    private async Task HandleSubmit()
+    {
+        // OnValidSubmit only fires if DataAnnotationsValidator passes —
+        // so we don't need to manually check formModel.IsValid or similar.
+
+        isSubmitting = true;
+        successMessage = null;
+        errorMessage = null;
+
+        try
+        {
+            // TODO: Replace with StrawberryShake typed call:
+            //   var result = await Client.RegisterUserAsync(new RegisterUserInput
+            //   {
+            //       Username = formModel.Username,
+            //       Email    = formModel.Email,
+            //       Password = formModel.Password
+            //   });
+            //
+            //   if (result.Data?.RegisterUser.Errors is { Count: > 0 } errors)
+            //       errorMessage = string.Join(", ", errors.Select(e => e.Message));
+            //   else
+            //       successMessage = $"Registered {result.Data!.RegisterUser.User!.Username}";
+
+            // Temporary: raw GraphQL POST until SS is wired up
+            using var response = await Http.PostAsJsonAsync("api/graphql", new
+            {
+                query = """
+                    mutation RegisterUser($input: RegisterUserInput!) {
+                        registerUser(input: $input) {
+                            user { id username email }
+                            errors { message code }
+                        }
+                    }
+                    """,
+                variables = new
+                {
+                    input = new
+                    {
+                        username = formModel.Username,
+                        email    = formModel.Email,
+                        password = formModel.Password
+                    }
+                }
+            });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = $"API error: {response.StatusCode}";
+                return;
+            }
+
+            var result = await response.Content
+                .ReadFromJsonAsync<GraphQLResponse<RegisterUserData>>();
+
+            // Check top-level GraphQL errors first (resolver exceptions, auth failures, etc.)
+            // These are distinct from the error-as-data payload errors checked below.
+            if (result is null)
+            {
+                errorMessage = "Failed to parse GraphQL response from API.";
+                return;
+            }
+
+            if (result.Errors is { Count: > 0 } topLevelErrors)
+            {
+                errorMessage = $"GraphQL error(s): {string.Join("; ", topLevelErrors.Select(e => e.Message))}";
+                return;
+            }
+
+            var payload = result.Data?.RegisterUser;
+
+            if (payload?.Errors is { Count: > 0 } validationErrors)
+            {
+                // The API returns validation errors as data (error-as-data pattern),
+                // not as HTTP errors. We surface them here.
+                errorMessage = string.Join(" | ", validationErrors.Select(e => $"{e.Code}: {e.Message}"));
+            }
+            else if (payload?.User is not null)
+            {
+                // Navigate to the user list so the new user is immediately visible.
+                // NavigationManager.NavigateTo() is the Blazor equivalent of
+                // React Router's navigate() or Next.js's router.push().
+                Nav.NavigateTo("/users");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Unexpected error: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    // =============================================================================
+    // FORM MODEL
+    //
+    // A plain C# class whose properties are bound to the form inputs above.
+    // Data annotations drive validation — same attributes used on EF Core models
+    // or MVC view models. The DataAnnotationsValidator component reads these at
+    // runtime and produces validation messages.
+    //
+    // TODO: Consider extracting this to a separate Models/ file once it grows.
+    // =============================================================================
+
+    private class RegisterForm
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Username is required")]
+        [System.ComponentModel.DataAnnotations.MinLength(3, ErrorMessage = "Username must be at least 3 characters")]
+        public string Username { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Email is required")]
+        [System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "Enter a valid email address")]
+        public string Email { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Password is required")]
+        [System.ComponentModel.DataAnnotations.MinLength(8, ErrorMessage = "Password must be at least 8 characters")]
+        public string Password { get; set; } = string.Empty;
+    }
+
+    // Temporary DTOs — replaced by SS-generated types once codegen runs.
+    // Property names must match the GraphQL response JSON keys (case-insensitive)
+    // because System.Text.Json binds by name with no [JsonPropertyName] attributes here.
+    private record CreateUserResult(int Id, string Username, string Email);
+    private record CreateUserError(string Message, string Code);
+    private record RegisterUserPayload(CreateUserResult? User, List<CreateUserError>? Errors);
+    private record RegisterUserData(RegisterUserPayload RegisterUser);
+    // GraphQLResponse<T> and GraphQLError live in GraphQL/Models/GraphQLResponse.cs
+}

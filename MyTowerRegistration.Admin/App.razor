@@ -1,0 +1,30 @@
+@* =============================================================================
+   APP.RAZOR — Root Component
+
+   This is the topmost Razor component. It owns the Router, which is Blazor's
+   equivalent of React Router or Next.js's routing layer.
+
+   The Router works by scanning this assembly at startup for all components that
+   have an @page directive. Each @page "/some-path" registers that component as
+   the handler for that URL. No central route table is needed — routes are
+   declared directly on the component that handles them.
+
+   The Found/NotFound structure is Blazor's way of expressing:
+     if (currentUrl matches a known @page) → render that component
+     else                                  → render NotFound.razor
+   ============================================================================= *@
+
+<Router AppAssembly="@typeof(App).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+    <Found Context="routeData">
+        @* RouteView renders the matched page component wrapped in its layout.
+           DefaultLayout applies to any page that doesn't specify its own
+           @layout directive. All our pages will use MainLayout unless they
+           explicitly opt out. *@
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+
+        @* FocusOnNavigate moves keyboard focus to the first <h1> on each
+           navigation. This is an accessibility feature — screen readers
+           announce the new page heading when focus moves to it. *@
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+</Router>

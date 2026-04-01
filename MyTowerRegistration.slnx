@@ -3,6 +3,9 @@
     <File Path=".editorconfig" />
     <File Path="README.md" />
   </Folder>
+  <Project Path="MyTowerRegistration.Admin/MyTowerRegistration.Admin.csproj">
+    <BuildDependency Project="MyTowerRegistration.API/MyTowerRegistration.API.csproj" />
+  </Project>
   <Project Path="MyTowerRegistration.API/MyTowerRegistration.API.csproj" />
   <Project Path="MyTowerRegistration.Data/MyTowerRegistration.Data.csproj" />
   <Project Path="MyTowerRegistration.Tests/MyTowerRegistration.Tests.csproj" />

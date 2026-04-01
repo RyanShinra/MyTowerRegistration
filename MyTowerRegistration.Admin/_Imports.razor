@@ -1,0 +1,29 @@
+@* =============================================================================
+   _IMPORTS.RAZOR — Global @using directives for all Razor components
+
+   This file is the Razor equivalent of C#'s global using statements.
+   Every @using here applies to ALL .razor files in this folder and all
+   subfolders — you don't need to repeat them at the top of each component.
+
+   Think of it as the "header" shared by every component in the project.
+
+   If you create a new service namespace, add it here so components can
+   @inject it without a fully qualified name.
+   ============================================================================= *@
+
+@using System.Net.Http
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Microsoft.AspNetCore.Components.WebAssembly.Http
+@using Microsoft.JSInterop
+@using MyTowerRegistration.Admin
+@using MyTowerRegistration.Admin.Layout
+
+@* Shared raw GraphQL response types — temporary until StrawberryShake replaces them *@
+@using MyTowerRegistration.Admin.GraphQL.Models
+
+@* TODO: When StrawberryShake codegen runs, add the generated client namespace:
+   @using MyTowerRegistration.Admin.GraphQL *@

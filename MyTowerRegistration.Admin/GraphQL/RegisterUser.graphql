@@ -1,0 +1,30 @@
+# RegisterUser — create a new user account.
+#
+# This is a mutation — an operation that modifies server-side data.
+# Mutations follow GraphQL convention: one top-level field per mutation,
+# returning a payload type that contains both the result and any errors.
+#
+# The error-as-data pattern (errors field alongside user) means:
+#   - Success: user is non-null, errors is null/empty
+#   - Failure: user is null, errors contains validation details
+#
+# StrawberryShake generates:
+#   RegisterUserAsync(RegisterUserInput input) → IRegisterUserResult
+#   result.Data.RegisterUser.User        ← the created user (nullable)
+#   result.Data.RegisterUser.Errors      ← validation errors (nullable list)
+#   result.Data.RegisterUser.Errors[0].Code    ← enum: USERNAME_TAKEN, etc.
+#   result.Data.RegisterUser.Errors[0].Message ← human-readable explanation
+
+mutation RegisterUser($input: RegisterUserInput!) {
+  registerUser(input: $input) {
+    user {
+      id
+      username
+      email
+    }
+    errors {
+      message
+      code
+    }
+  }
+}
