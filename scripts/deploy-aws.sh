@@ -221,7 +221,7 @@ echo "OK"
 echo ""
 echo "--- Step 4: Storing DB password in Secrets Manager ---"
 echo -n "Choose a password for the RDS Postgres database: "
-read -rs DB_PASSWORD
+read -r DB_PASSWORD
 echo ""
 
 # We store a placeholder now and update with the full connection string in step 8,
@@ -775,7 +775,7 @@ EXISTING_OAC=$(aws cloudfront list-origin-access-controls \
     --query "OriginAccessControlList.Items[?Name=='mytower-admin-oac'].Id" \
     --output text 2>/dev/null || echo "")
 
-if [ -z "${EXISTING_OAC}" ]; then
+if [ -z "${EXISTING_OAC}" ] || [ "${EXISTING_OAC}" = "None" ]; then
     OAC_ID=$(aws cloudfront create-origin-access-control \
         --origin-access-control-config \
         "Name=mytower-admin-oac,Description=OAC for MyTowerRegistration Admin S3 bucket,OriginAccessControlOriginType=s3,SigningBehavior=always,SigningProtocol=sigv4" \
@@ -794,7 +794,7 @@ EXISTING_CF_ID=$(aws cloudfront list-distributions \
     --query "DistributionList.Items[?Comment=='MyTowerRegistration Admin'].Id" \
     --output text 2>/dev/null || echo "")
 
-if [ -z "${EXISTING_CF_ID}" ]; then
+if [ -z "${EXISTING_CF_ID}" ] || [ "${EXISTING_CF_ID}" = "None" ]; then
     CF_OUTPUT=$(aws cloudfront create-distribution --distribution-config "$(cat <<EOF
 {
     "CallerReference": "mytower-admin-$(date +%s)",
