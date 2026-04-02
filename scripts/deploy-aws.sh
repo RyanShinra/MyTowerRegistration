@@ -796,9 +796,11 @@ fi
 # PriceClass_100 = US, Canada, Europe only — the cheapest tier.
 # The CachePolicyId is AWS's managed "CachingOptimized" policy — it caches
 # aggressively based on Cache-Control headers, which Blazor publish sets correctly.
+# read returns space-separated IDs if the Comment matches multiple distributions
+# (e.g. from a failed prior run). Take only the first to keep subsequent calls safe.
 EXISTING_CF_ID=$(aws cloudfront list-distributions \
     --query "DistributionList.Items[?Comment=='MyTowerRegistration Admin'].Id" \
-    --output text 2>/dev/null || echo "")
+    --output text 2>/dev/null | awk '{print $1}' || echo "")
 
 if [ -z "${EXISTING_CF_ID}" ] || [ "${EXISTING_CF_ID}" = "None" ]; then
     CF_OUTPUT=$(aws cloudfront create-distribution --distribution-config "$(cat <<EOF
