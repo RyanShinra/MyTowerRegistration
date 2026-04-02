@@ -20,7 +20,6 @@
 //   4. Run                                          — app.Run()
 // =============================================================================
 
-using HotChocolate.Execution;
 using Microsoft.EntityFrameworkCore;
 using MyTowerRegistration.Data;
 using MyTowerRegistration.Data.Repositories;
@@ -106,20 +105,22 @@ builder.Services
 
 // --- CORS ------------------------------------------------------------------
 // CORS (Cross-Origin Resource Sharing) is a browser security mechanism.
-// When the Blazor Admin app (localhost:5273) calls this API (localhost:5026),
-// the browser considers it a cross-origin request and blocks it by default.
-// We opt in by declaring exactly which origins are allowed.
+// When the Blazor Admin app (e.g. https://xxx.cloudfront.net) calls this API
+// (https://alb-dns/api/graphql), the browser considers it a cross-origin
+// request and blocks it by default. We opt in by declaring which origins are
+// allowed.
 //
-// The allowed origins come from configuration (appsettings.Development.json
-// in dev, appsettings.json in prod) so they can differ per environment
-// without code changes. In production this will be https://admin.mytower.dev.
+// The allowed origins come from configuration so they can differ per environment
+// without code changes:
+//   - Dev: appsettings.Development.json → localhost ports
+//   - Prod: AllowedOrigins__0 env var in ECS task definition → CloudFront URL
 //
-// AllowAnyHeader / AllowAnyMethod: GraphQL uses Content-Type: application/json
-// and POST — these are standard, so permitting all headers/methods is fine here.
-// For a public API you'd be more restrictive.
+// AllowAnyHeader/AllowAnyMethod: GraphQL uses Content-Type: application/json
+// and POST, both standard — permitting all headers/methods is fine here.
 //
-// IMPORTANT: UseCors() must be called BEFORE MapGraphQL() in the middleware
-// pipeline. Middleware order is significant — requests flow top to bottom.
+// IMPORTANT: UseCors("AdminPolicy") must be called BEFORE MapGraphQL() in the
+// middleware pipeline below. The browser sends a preflight OPTIONS request
+// before the real POST — UseCors handles that response.
 string[] allowedOrigins = builder.Configuration
     .GetSection("AllowedOrigins")
     .Get<string[]>() ?? [];
@@ -130,18 +131,13 @@ builder.Services.AddCors(options =>
     {
         if (allowedOrigins.Length > 0)
         {
-            // Restrict to the configured origins — the right behaviour for any
-            // environment that has AllowedOrigins set in its appsettings.
             policy.WithOrigins(allowedOrigins)
                   .AllowAnyHeader()
                   .AllowAnyMethod();
         }
-        // If AllowedOrigins is empty or missing (e.g. production before the
-        // Admin app is deployed), the policy simply allows nothing — no CORS
-        // headers are emitted, so browser-side cross-origin calls are blocked.
-        // This is the safe default: no frontend, no access.
-        // TODO Phase 5: populate AllowedOrigins in production appsettings once
-        // the Admin app has a stable URL (https://admin.mytower.dev).
+        // If AllowedOrigins is empty (e.g. no env var set in ECS yet), the
+        // policy allows nothing — no CORS headers are emitted, browser blocks
+        // cross-origin calls. Safe default: no frontend configured, no access.
     });
 });
 
@@ -222,7 +218,6 @@ if (app.Environment.IsDevelopment())
 //
 //   Compare to Apollo: app.use('/graphql', expressMiddleware(server));
 //   Default path is /graphql. Customize with: app.MapGraphQL("/api/graphql");
-
 // Apply the CORS policy before mapping endpoints. The browser sends a preflight
 // OPTIONS request before the real POST — UseCors handles that response.
 app.UseCors("AdminPolicy");

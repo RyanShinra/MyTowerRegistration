@@ -201,6 +201,44 @@ Assert.Equivalent(existingUser, result.User); // field-by-field — different in
 
 ---
 
+### Bash / Deploy Scripts
+
+**S3 `create-bucket` must omit `--create-bucket-configuration` in `us-east-1`.**
+Every other region requires `LocationConstraint=<region>`, but `us-east-1` is the default
+and AWS rejects the parameter there with a `MalformedXML` / `InvalidLocationConstraint`
+error. Always guard with a region check.
+
+```bash
+if [ "${AWS_REGION}" = "us-east-1" ]; then
+    aws s3api create-bucket --bucket "${BUCKET}" --region "${AWS_REGION}"
+else
+    aws s3api create-bucket --bucket "${BUCKET}" --region "${AWS_REGION}" \
+        --create-bucket-configuration LocationConstraint="${AWS_REGION}"
+fi
+```
+
+**Patch deploy artifacts, not source-tree files; use placeholders in committed config.**
+Deploy scripts that `jq`-patch a tracked config file (e.g. `wwwroot/appsettings.json`)
+leave a dirty working tree after every run, and the committed value ends up environment-
+specific. Keep a placeholder value (e.g. `"__API_BASE_URL__"`) in the committed file and
+patch the *published* output directory instead. The Development override file handles
+local dev.
+
+**Blazor WASM served over HTTPS cannot call an HTTP API (mixed-content policy).**
+Browsers block HTTP subrequests from HTTPS pages. When a CloudFront distribution serves
+the Blazor app over HTTPS, `ApiBaseUrl` must also be HTTPS — either route API traffic
+through the same CloudFront distribution under a `/api/*` behavior, or terminate TLS on
+the ALB directly.
+
+**`--export-schema` fast-exit in Program.cs must be preserved across merges.**
+The MSBuild `ExportSchema` target (Debug only) calls `dotnet "$(TargetPath)" --export-schema`
+after every build. Without the fast-exit guard in `Program.cs`, the process starts Kestrel,
+opens ports, and hangs — `schema.graphql` is never regenerated. After any merge that touches
+`Program.cs`, verify the guard is still present between `builder.Build()` and the middleware
+pipeline.
+
+---
+
 ## Architecture Notes
 
 - Raw `HttpClient` GraphQL calls in Blazor pages are **temporary** — StrawberryShake

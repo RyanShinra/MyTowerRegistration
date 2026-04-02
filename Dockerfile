@@ -2,15 +2,21 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Install dotnet-ef tool early — rarely changes, so this layer stays cached across source changes
-RUN dotnet tool install --global dotnet-ef --version 10.0.0
-ENV PATH="$PATH:/root/.dotnet/tools"
-
 # Copy solution and project files first (layer caching for restore)
+# Adding dotnet-tools.json here means tool restore is also cached until
+# tool versions change — same principle as caching NuGet packages separately.
+COPY dotnet-tools.json .
 COPY MyTowerRegistration.sln .
 COPY MyTowerRegistration.API/MyTowerRegistration.API.csproj MyTowerRegistration.API/
 COPY MyTowerRegistration.Data/MyTowerRegistration.Data.csproj MyTowerRegistration.Data/
 COPY MyTowerRegistration.Tests/MyTowerRegistration.Tests.csproj MyTowerRegistration.Tests/
+COPY MyTowerRegistration.Admin/MyTowerRegistration.Admin.csproj MyTowerRegistration.Admin/
+
+# dotnet tool restore installs local tools from dotnet-tools.json (dotnet-ef, husky).
+# This replaces the old global install approach — local tools lock exact versions
+# per-repo and are the idiomatic .NET way to share CLI tool dependencies.
+RUN dotnet tool restore
+ENV PATH="$PATH:/root/.dotnet/tools"
 
 RUN dotnet restore
 
