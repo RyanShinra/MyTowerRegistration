@@ -20,78 +20,85 @@ the .NET ecosystem — before the game frontends are connected to it.
 | **API** | GraphQL registration API — register user, query users |
 | **Data layer** | EF Core + PostgreSQL, repository pattern, code-first migrations |
 | **Containerisation** | Multi-stage Dockerfile, Docker Compose stack (db + migrations + api) |
+| **Admin UI** | Blazor WASM admin frontend — list and delete users |
 | **AWS deployment** | ECS Fargate + RDS PostgreSQL + Secrets Manager + CloudWatch |
+| **Load balancer** | ALB in front of ECS; stable URL independent of task restarts |
+| **Static hosting** | Blazor admin deployed to S3 + CloudFront (HTTPS, SPA routing) |
 | **Deploy script** | `scripts/deploy-aws.sh` — idempotent, one-command deployment |
-| **Domain** | `mytower.dev` and `mytowergame.com` registered at Namecheap |
+| **Domains** | `mytower.dev` and `mytowergame.com` registered at Namecheap |
 
 ### Architecture Today
 
 ```
-Docker Compose (local dev)          AWS ECS (deployed)
-──────────────────────────          ──────────────────
+Docker Compose (local dev)          AWS (deployed)
+──────────────────────────          ──────────────────────────────────────
 db (Postgres 18)                    RDS PostgreSQL 16
 db-migrations (EF bundle)           ECS one-off task (migrations)
-api (ASP.NET Core + Hot Choc)       ECS service (API, Fargate)
+api (ASP.NET Core + Hot Choc)       ECS Fargate service
+                                    ↑
+                                    ALB (stable DNS, health checks)
+
+admin (Blazor WASM)                 S3 bucket (static files)
+                                    ↑
+                                    CloudFront (HTTPS, SPA 404→index.html)
 ```
 
 ---
 
 ## What's Next
 
-### Phase 3 — Registration Frontend
+### Phase 3 — Custom Domains + HTTPS on ALB
 
-A web frontend (likely Next.js or React) that calls the GraphQL API directly.
-Intended as the player-facing registration and profile page at `io.mytower.dev`.
+DNS and TLS are the last step before sharing the service publicly.
 
-- GraphQL client (Apollo Client or urql)
-- Register / login UI
-- Profile page
+1. Delegate `mytower.dev` nameservers to Route 53
+2. Issue SSL certificate via ACM (`*.mytower.dev` or individual subdomains)
+3. Add HTTPS listener on the ALB; terminate TLS there
+4. DNS records:
+   - `api.mytower.dev` → ALB
+   - `admin.mytower.dev` → CloudFront distribution
+5. Update deploy script to set `ApiBaseUrl` to `https://api.mytower.dev`
+   instead of the CloudFront domain (eliminates the need to route `/api/*`
+   through CloudFront)
 
-### Phase 4 — Python Game Frontend + Identity Linking
+### Phase 4 — StrawberryShake Typed GraphQL Client
 
-The Python tower game already exists as a separate project. The next
-step is linking player identity from the registration DB into the game so that:
+The Blazor admin currently uses raw `HttpClient` calls with hand-written DTOs.
+StrawberryShake generates strongly-typed C# client code from `schema.graphql`
+at build time — the same pattern as Apollo codegen in the JS ecosystem.
 
-- Game progress is tied to a registered account
-- Scores and progress persist across sessions
-- The registration and game backends share a user identity
+- Add StrawberryShake to the Admin project
+- Replace raw `HttpClient` calls with generated client
+- `schema.graphql` is already auto-exported on every Debug build
 
-The Python game's backend will call `io.mytower.dev` for identity verification.
+### Phase 5 — Security Hardening
 
-### Phase 5 — Stable URL (ALB + Domain)
-
-Currently the ECS task gets an ephemeral public IP on each start. Before sharing
-links publicly (resume, portfolio), a stable URL is needed:
-
-1. Set up an Application Load Balancer (ALB) in front of ECS
-   - Routes `io.mytower.dev` → .NET registration API
-   - Routes `game.mytower.dev` → Python game backend
-   - One ALB (~$16/month) serves both backends
-2. Point `mytower.dev` nameservers to Route 53
-3. Issue free SSL certificate via AWS Certificate Manager (ACM)
-4. HTTPS on both subdomains
-
-### Phase 6 — Security Review
-
-Before making the service permanently available under a registered domain:
+Before the service is permanently public under a registered domain:
 
 - Replace `Trust Server Certificate=true` with proper RDS CA bundle validation
 - Review IAM permissions (principle of least privilege)
 - Add rate limiting to the registration endpoint
 - Replace SHA-256 password hashing with BCrypt or Argon2 (with salt)
-- Review CORS policy for frontend origins
 - Consider adding authentication tokens (JWT) for the game identity flow
+
+### Phase 6 — Python Game Frontend + Identity Linking
+
+The Python tower game exists as a separate project. The next step is linking
+player identity from the registration DB into the game so that:
+
+- Game progress is tied to a registered account
+- Scores and progress persist across sessions
+- The registration and game backends share a user identity
+
+The Python game's backend will call `api.mytower.dev` for identity verification.
 
 ### Phase 7 — iOS and Steam Clients
 
 Once the web frontend and Python game are stable, native clients can be added.
-The API endpoint (`io.mytower.dev/api/graphql`) works identically for:
+The GraphQL endpoint is platform-agnostic — no API changes needed for:
 
-- Web browsers
 - iOS apps (via Apollo iOS or URLSession)
 - Steam / desktop clients
-
-No API changes are needed — the GraphQL endpoint is platform-agnostic.
 
 ---
 
@@ -100,9 +107,9 @@ No API changes are needed — the GraphQL endpoint is platform-agnostic.
 | Domain | Purpose |
 |---|---|
 | `mytower.dev` | Infrastructure / API domain |
-| `io.mytower.dev` | Registration API (once ALB is set up) |
-| `game.mytower.dev` | Python game backend |
+| `api.mytower.dev` | Registration API (ALB) |
+| `admin.mytower.dev` | Blazor admin UI (CloudFront) |
 | `mytowergame.com` | Player-facing marketing / landing page |
 
-Both domains are currently registered at Namecheap. DNS will be delegated to
-Route 53 when the ALB is configured (Phase 5).
+Both domains are registered at Namecheap. DNS will be delegated to Route 53
+in Phase 3.
