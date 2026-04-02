@@ -421,17 +421,12 @@ else
         --secret-id "${SECRET_NAME}" \
         --secret-string "${SECRET_JSON}"
 
-    # Clear sensitive values from memory
+    # Clear sensitive values from memory — CONNECTION_STRING and SECRET_JSON
+    # both contain the plaintext password, so unset them along with DB_PASSWORD.
     unset DB_PASSWORD
     unset CONNECTION_STRING
     unset SECRET_JSON
 fi
-
-# Clear all sensitive values from memory — CONNECTION_STRING and SECRET_JSON
-# both contain the plaintext password, so unset them along with DB_PASSWORD.
-unset DB_PASSWORD
-unset CONNECTION_STRING
-unset SECRET_JSON
 
 echo "OK"
 
@@ -750,33 +745,22 @@ echo "OK"
 echo ""
 echo "--- Step 13: Building and deploying Blazor Admin ---"
 
-# --- Patch Blazor's API URL ------------------------------------------------
-ADMIN_APPSETTINGS="./MyTowerRegistration.Admin/wwwroot/appsettings.json"
-
-# Substitute the ALB DNS for the placeholder URL in wwwroot/appsettings.json.
-# This file is downloaded by the browser at startup as plain text — it is NOT
-# a secret. Using jq prevents breakage if the DNS name contains special chars.
-jq --arg url "http://${ALB_DNS}" '.ApiBaseUrl = $url' "${ADMIN_APPSETTINGS}" \
-    > "${ADMIN_APPSETTINGS}.tmp" && mv "${ADMIN_APPSETTINGS}.tmp" "${ADMIN_APPSETTINGS}"
-echo "Patched ApiBaseUrl → http://${ALB_DNS}"
-
-# --- Build and publish -----------------------------------------------------
-# `dotnet publish` compiles the Blazor project in Release configuration.
-# Output lands in ./publish/admin/wwwroot/ — that's the static site root.
-dotnet publish ./MyTowerRegistration.Admin/MyTowerRegistration.Admin.csproj \
-    --configuration Release \
-    --output ./publish/admin
-echo "Blazor publish complete."
-
 # --- S3 bucket -------------------------------------------------------------
 # We block all public access on the bucket — CloudFront fetches objects using
 # an Origin Access Control (OAC), which signs requests with SigV4. The bucket
 # is never exposed to the public internet directly.
 if ! aws s3api head-bucket --bucket "${BLAZOR_BUCKET}" > /dev/null 2>&1; then
-    aws s3api create-bucket \
-        --bucket "${BLAZOR_BUCKET}" \
-        --region "${AWS_REGION}" \
-        --create-bucket-configuration LocationConstraint="${AWS_REGION}"
+    # us-east-1 must omit --create-bucket-configuration; all other regions require it.
+    if [ "${AWS_REGION}" = "us-east-1" ]; then
+        aws s3api create-bucket \
+            --bucket "${BLAZOR_BUCKET}" \
+            --region "${AWS_REGION}"
+    else
+        aws s3api create-bucket \
+            --bucket "${BLAZOR_BUCKET}" \
+            --region "${AWS_REGION}" \
+            --create-bucket-configuration LocationConstraint="${AWS_REGION}"
+    fi
 
     aws s3api put-public-access-block \
         --bucket "${BLAZOR_BUCKET}" \
@@ -787,11 +771,6 @@ if ! aws s3api head-bucket --bucket "${BLAZOR_BUCKET}" > /dev/null 2>&1; then
 else
     echo "Reusing existing S3 bucket: ${BLAZOR_BUCKET}"
 fi
-
-# Sync the published wwwroot to S3. --delete removes stale files from previous
-# deploys (e.g. old versioned .wasm files that were renamed in the new build).
-aws s3 sync ./publish/admin/wwwroot "s3://${BLAZOR_BUCKET}/" --delete
-echo "Files uploaded to s3://${BLAZOR_BUCKET}/"
 
 # --- CloudFront Origin Access Control (OAC) --------------------------------
 # OAC is the modern replacement for the older Origin Access Identity (OAI).
@@ -897,6 +876,34 @@ aws s3api put-bucket-policy --bucket "${BLAZOR_BUCKET}" --policy "$(jq -n \
     }')"
 
 echo "S3 bucket policy attached (CloudFront OAC only)."
+
+# --- Build and publish -----------------------------------------------------
+# `dotnet publish` compiles the Blazor project in Release configuration.
+# Output lands in ./publish/admin/wwwroot/ — that's the static site root.
+# We publish AFTER CloudFront is created so CF_DOMAIN is available to patch
+# into the published artifact. The source file keeps its placeholder value.
+dotnet publish ./MyTowerRegistration.Admin/MyTowerRegistration.Admin.csproj \
+    --configuration Release \
+    --output ./publish/admin
+echo "Blazor publish complete."
+
+# --- Patch Blazor's API URL in the published artifact ----------------------
+# appsettings.json is downloaded by the browser at startup — it is NOT a secret.
+# We patch the PUBLISHED copy (not the source tree) so the committed file keeps
+# its placeholder value and the repo working tree is never dirtied by a deploy.
+# HTTPS is required: the Blazor app is served over HTTPS by CloudFront, so the
+# API URL must also be HTTPS or the browser blocks it (mixed-content policy).
+PUBLISHED_APPSETTINGS="./publish/admin/wwwroot/appsettings.json"
+jq --arg url "https://${CF_DOMAIN}" '.ApiBaseUrl = $url' "${PUBLISHED_APPSETTINGS}" \
+    > "${PUBLISHED_APPSETTINGS}.tmp" && mv "${PUBLISHED_APPSETTINGS}.tmp" "${PUBLISHED_APPSETTINGS}"
+echo "Patched published ApiBaseUrl → https://${CF_DOMAIN}"
+
+# --- Sync to S3 ------------------------------------------------------------
+# Sync the published wwwroot to S3. --delete removes stale files from previous
+# deploys (e.g. old versioned .wasm files that were renamed in the new build).
+aws s3 sync ./publish/admin/wwwroot "s3://${BLAZOR_BUCKET}/" --delete
+echo "Files uploaded to s3://${BLAZOR_BUCKET}/"
+
 echo "Note: the distribution takes ~15 min to propagate globally — CF_DOMAIN is"
 echo "available immediately and used for CORS config in step 14."
 echo "OK"
