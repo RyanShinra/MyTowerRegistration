@@ -20,6 +20,7 @@
 //   4. Run                                          — app.Run()
 // =============================================================================
 
+using HotChocolate.Execution;
 using Microsoft.EntityFrameworkCore;
 using MyTowerRegistration.Data;
 using MyTowerRegistration.Data.Repositories;
