@@ -5,17 +5,18 @@ It is a companion to [AWS_CONSOLE_GUIDE.md](AWS_CONSOLE_GUIDE.md).
 
 ---
 
-## Current State (as of 2026-04-03)
+## Current State (as of 2026-04-09)
 
 | Step | Status |
 |---|---|
-| ACM wildcard cert `*.mytower.dev` + `mytower.dev` | **Done — Issued** |
+| ACM wildcard cert `*.mytower.dev` + `mytower.dev` (us-east-1, for CloudFront) | **Done — Issued (free, non-exportable)** |
+| ACM wildcard cert `*.mytower.dev` + `mytower.dev` (us-east-2, for ALB) | **Done — Issued (free, non-exportable)** |
 | Namecheap DNS validation CNAME | **Done** |
-| ALB HTTPS listener + HTTP→HTTPS redirect | Pending |
-| CloudFront alternate domain + cert | Pending |
-| Namecheap: `api.mytower.dev` CNAME | Pending |
-| Namecheap: `admin.mytower.dev` CNAME | Pending |
-| `deploy.sh` constants update | Pending |
+| ALB HTTPS listener + HTTP→HTTPS redirect | **Done** |
+| CloudFront alternate domain + cert | **Done** |
+| Namecheap: `admin-api.mytower.dev` CNAME → ALB | **Done** |
+| Namecheap: `admin.mytower.dev` CNAME → CloudFront | **Done** |
+| `deploy.sh` constants update | **Done** |
 
 ---
 
@@ -23,7 +24,7 @@ It is a companion to [AWS_CONSOLE_GUIDE.md](AWS_CONSOLE_GUIDE.md).
 
 | Resource | Value |
 |---|---|
-| ACM cert ARN | Look up in ACM console → us-east-1 → `*.mytower.dev` |
+| ACM cert ARN | `arn:aws:acm:us-east-1:151935250464:certificate/07a46b81-bf79-4c1d-8319-92f135aa8d4f` |
 | ALB DNS name | `mytower-registration-alb-90596354.us-east-2.elb.amazonaws.com` |
 | CloudFront domain | `dlkzg304jfbpr.cloudfront.net` |
 | CloudFront distribution ID | `E20OTOLXT2QXNM` |
@@ -54,7 +55,22 @@ Validation CNAME added to Namecheap:
 4. SSL/TLS certificate: choose **From ACM** → select `*.mytower.dev`
 5. Click **Add**
 
-### 2b. Change HTTP listener to redirect
+### 2b. Open port 443 in the ALB security group
+
+The ALB's security group needs an inbound rule for HTTPS traffic. This is safe — an
+internet-facing ALB is meant to accept traffic from anywhere; the ECS tasks' security
+group only allows traffic *from the ALB security group*, not from the internet directly.
+
+**Console path:** EC2 → Security Groups → select the security group attached to `mytower-registration-alb` → **Inbound rules** → **Edit inbound rules**
+
+Add a rule:
+- Type: **HTTPS**
+- Port: **443**
+- Source: **0.0.0.0/0** (add `::/0` as a second source for IPv6)
+
+Click **Save rules**. The "Listener port unreachable" warning on the ALB should clear.
+
+### 2c. Change HTTP listener to redirect
 
 The existing port 80 listener currently forwards traffic. Change it to redirect:
 
