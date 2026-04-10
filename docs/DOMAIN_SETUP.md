@@ -87,14 +87,14 @@ Add two CNAME records:
 
 | Type | Host | Value | TTL |
 |---|---|---|---|
-| CNAME | `api` | `mytower-registration-alb-90596354.us-east-2.elb.amazonaws.com` | Automatic |
+| CNAME | `admin-api` | `mytower-registration-alb-90596354.us-east-2.elb.amazonaws.com` | Automatic |
 | CNAME | `admin` | `dlkzg304jfbpr.cloudfront.net` | Automatic |
 
 DNS propagation is usually fast (seconds to minutes) but can take up to an hour.
 
 **Test with:**
 ```bash
-dig api.mytower.dev
+dig admin-api.mytower.dev
 dig admin.mytower.dev
 ```
 
@@ -111,13 +111,13 @@ Find the block that reads:
 ```bash
 # Once mytower.dev DNS is configured, these become stable constants:
 #   ADMIN_ORIGIN="https://admin.mytower.dev"
-#   API_BASE_URL="https://api.mytower.dev"
+#   API_BASE_URL="https://admin-api.mytower.dev"
 ```
 
 And replace the dynamic lookup lines above it with:
 ```bash
 ADMIN_ORIGIN="https://admin.mytower.dev"
-API_BASE_URL="https://api.mytower.dev"
+API_BASE_URL="https://admin-api.mytower.dev"
 ```
 
 Remove the dynamic CF_DOMAIN lookup lines — they're no longer needed.
@@ -128,9 +128,9 @@ Remove the dynamic CF_DOMAIN lookup lines — they're no longer needed.
 
 After all steps:
 
-- [ ] `https://api.mytower.dev/api/graphql` loads the Nitro playground
+- [ ] `https://admin-api.mytower.dev/api/graphql` loads the Nitro playground
 - [ ] `https://admin.mytower.dev` loads the Blazor admin app
-- [ ] `http://api.mytower.dev` redirects to `https://` (ALB redirect)
+- [ ] `http://admin-api.mytower.dev` redirects to `https://` (ALB redirect)
 - [ ] `http://admin.mytower.dev` redirects to `https://` (CloudFront enforces HTTPS)
 - [ ] No mixed-content warnings in browser DevTools
 

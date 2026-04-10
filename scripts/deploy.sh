@@ -85,13 +85,10 @@ API_PORT=8080
 LOG_GROUP="/ecs/mytower-registration"
 HEALTH_CHECK_PATH="/api/graphql/"
 
-# CORS and API URL
-# Once mytower.dev DNS is configured, these become stable constants:
-#   ADMIN_ORIGIN="https://admin.mytower.dev"
-#   API_BASE_URL="https://api.mytower.dev"
-# Until then, both are derived from the auto-generated CloudFront domain
-# (looked up below in the infrastructure preflight).
+# CORS and API URL — stable constants now that mytower.dev DNS is configured.
 # See: scripts/setup-infra.sh and the domain setup runbook.
+ADMIN_ORIGIN="https://admin.mytower.dev"
+API_BASE_URL="https://admin-api.mytower.dev"
 
 echo "=== MyTowerRegistration Deployment ==="
 echo "Region: ${AWS_REGION} | Account: ${AWS_ACCOUNT_ID}"
@@ -122,18 +119,9 @@ CF_ID=$(aws cloudfront list-distributions \
     --output text 2>/dev/null | awk '{print $1}')
 [ -z "${CF_ID}" ] && { echo "ERROR: CloudFront distribution not found. Run setup-infra.sh first."; exit 1; }
 
-CF_DOMAIN=$(aws cloudfront get-distribution \
-    --id "${CF_ID}" \
-    --query 'Distribution.DomainName' --output text)
-
-# Derive CORS origin and API URL from the CloudFront domain until mytower.dev
-# DNS is configured and these lines are replaced with the constants above.
-ADMIN_ORIGIN="https://${CF_DOMAIN}"
-API_BASE_URL="https://${CF_DOMAIN}"
-
 echo "  Secret ARN : ${SECRET_ARN}"
 echo "  Target group: ${TG_ARN}"
-echo "  CloudFront  : ${CF_DOMAIN}"
+echo "  CloudFront  : ${CF_ID}"
 echo "  Admin origin: ${ADMIN_ORIGIN}"
 echo "OK"
 
@@ -448,8 +436,8 @@ ALB_DNS=$(aws elbv2 describe-load-balancers \
 echo ""
 echo "=== Deployment complete! ==="
 echo ""
-echo "  API (via ALB):   http://${ALB_DNS}/api/graphql"
-echo "  Admin UI:        https://${CF_DOMAIN}"
+echo "  API (via ALB):   https://admin-api.mytower.dev/api/graphql"
+echo "  Admin UI:        https://admin.mytower.dev"
 echo "  CloudWatch logs: https://${AWS_REGION}.console.aws.amazon.com/cloudwatch/home?region=${AWS_REGION}#logsV2:log-groups/log-group/${LOG_GROUP//\//%2F}"
 echo ""
 echo "Notes:"
