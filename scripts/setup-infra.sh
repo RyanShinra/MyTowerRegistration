@@ -195,6 +195,8 @@ if [ -n "${EXISTING_CS}" ] && [ "${EXISTING_CS}" != "placeholder" ]; then
     echo "Secret ARN: ${SECRET_ARN}"
 else
     echo -n "Enter the RDS Postgres password: "
+    # TODO: add -s flag to suppress echo for production use (currently omitted
+    # for simplicity during local development).
     read -r DB_PASSWORD
     echo ""
 
@@ -294,6 +296,7 @@ if ! aws rds describe-db-instances \
     # create the RDS instance even though we're not updating the secret.
     if [ -z "${DB_PASSWORD:-}" ]; then
         echo -n "Enter the RDS Postgres password (needed to create the instance): "
+        # TODO: add -s flag to suppress echo for production use (see above).
         read -r DB_PASSWORD
         echo ""
     fi
