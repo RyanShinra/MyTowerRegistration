@@ -297,7 +297,11 @@ echo "Patched published ApiBaseUrl → ${API_BASE_URL}"
 
 # --delete removes stale files from previous deploys (e.g. old versioned
 # .wasm files that were renamed in the new build).
-aws s3 sync ./publish/admin/wwwroot "s3://${BLAZOR_BUCKET}/" --delete
+# --size-only compares by file size rather than last-modified timestamp.
+# Timestamp comparison is unreliable across machines (e.g. Mac vs WSL) —
+# a local file with an earlier mtime than the S3 copy gets skipped even
+# if the S3 copy was deleted in the same --delete pass.
+aws s3 sync ./publish/admin/wwwroot "s3://${BLAZOR_BUCKET}/" --delete --size-only
 echo "Files uploaded to s3://${BLAZOR_BUCKET}/"
 
 aws cloudfront create-invalidation \
