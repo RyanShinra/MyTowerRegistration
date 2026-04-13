@@ -118,7 +118,7 @@ Or use [dnschecker.org](https://dnschecker.org) to check from multiple locations
 
 ---
 
-## Step 5 — Update deploy.sh
+## Step 5 — Update deploy.sh ✅ Done
 
 Once DNS is working and HTTPS is confirmed on both subdomains, update
 `scripts/deploy.sh` to replace the dynamic CloudFront lookup with hardcoded constants.

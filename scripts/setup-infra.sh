@@ -289,6 +289,14 @@ echo "--- Creating RDS Postgres instance (this takes 5-10 minutes) ---"
 
 if ! aws rds describe-db-instances \
     --db-instance-identifier "${RDS_INSTANCE_ID}" > /dev/null 2>&1; then
+    # DB_PASSWORD is unset when SKIP_SECRET_UPDATE=true (secret already existed
+    # from a previous run). Re-prompt here — the password is still needed to
+    # create the RDS instance even though we're not updating the secret.
+    if [ -z "${DB_PASSWORD:-}" ]; then
+        echo -n "Enter the RDS Postgres password (needed to create the instance): "
+        read -r DB_PASSWORD
+        echo ""
+    fi
     aws rds create-db-instance \
         --db-instance-identifier "${RDS_INSTANCE_ID}" \
         --db-instance-class db.t3.micro \
@@ -382,10 +390,10 @@ echo "OK"
 # from the internet. The ECS security group is locked to "from ALB SG only"
 # — ECS tasks are unreachable directly from the internet.
 #
-# Note: the old deploy-aws.sh had a Step 6 that briefly opened port 8080 to
-# 0.0.0.0/0 for smoke-testing before the ALB existed. That step is omitted
-# here because setup-infra.sh creates the ALB in the same run — there is no
-# smoke-test phase. The ECS SG goes directly to ALB-only access.
+# Note: the old monolithic deploy script had a step that briefly opened port
+# 8080 to 0.0.0.0/0 for smoke-testing before the ALB existed. That step is
+# omitted here because setup-infra.sh creates the ALB in the same run — there
+# is no smoke-test phase. The ECS SG goes directly to ALB-only access.
 echo ""
 echo "--- Step 8: Creating Application Load Balancer ---"
 
@@ -396,6 +404,9 @@ VPC_ID=$(aws ec2 describe-security-groups \
     --output text)
 
 # --- ALB security group: accept HTTP from internet -------------------------
+# Port 443 (HTTPS) is intentionally omitted here. It is added later when the
+# HTTPS listener is configured as part of the domain setup (DOMAIN_SETUP.md
+# step 2b). Adding it now without a certificate attached would have no effect.
 EXISTING_ALB_SG=$(aws ec2 describe-security-groups \
     --filters "Name=group-name,Values=${ALB_SG_NAME}" "Name=vpc-id,Values=${VPC_ID}" \
     --query 'SecurityGroups[0].GroupId' \

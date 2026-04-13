@@ -285,6 +285,13 @@ echo "Migrations completed successfully."
 echo ""
 echo "--- Step 4: Building and deploying Blazor Admin ---"
 
+# Clean the output directory first so every file gets a fresh mtime.
+# Without this, s3 sync can skip files whose local mtime is older than the
+# S3 copy — notably appsettings.json, which can change content without
+# changing size (same-length URL), causing the patched value to be silently
+# skipped on cross-machine deploys (e.g. Mac vs WSL).
+rm -rf ./publish/admin
+
 dotnet publish ./MyTowerRegistration.Admin/MyTowerRegistration.Admin.csproj \
     --configuration Release \
     --output ./publish/admin
@@ -297,11 +304,7 @@ echo "Patched published ApiBaseUrl → ${API_BASE_URL}"
 
 # --delete removes stale files from previous deploys (e.g. old versioned
 # .wasm files that were renamed in the new build).
-# --size-only compares by file size rather than last-modified timestamp.
-# Timestamp comparison is unreliable across machines (e.g. Mac vs WSL) —
-# a local file with an earlier mtime than the S3 copy gets skipped even
-# if the S3 copy was deleted in the same --delete pass.
-aws s3 sync ./publish/admin/wwwroot "s3://${BLAZOR_BUCKET}/" --delete --size-only
+aws s3 sync ./publish/admin/wwwroot "s3://${BLAZOR_BUCKET}/" --delete
 echo "Files uploaded to s3://${BLAZOR_BUCKET}/"
 
 aws cloudfront create-invalidation \
@@ -418,7 +421,8 @@ else
         --cluster "${ECS_CLUSTER}" \
         --service "${API_SERVICE_NAME}" \
         --task-definition "${API_TASK_FAMILY}" \
-        --desired-count 1 > /dev/null
+        --desired-count 1 \
+        --force-new-deployment > /dev/null
     echo "ECS service updated."
 fi
 
@@ -433,10 +437,6 @@ echo "OK"
 # =============================================================================
 # DONE
 # =============================================================================
-ALB_DNS=$(aws elbv2 describe-load-balancers \
-    --names "${ALB_NAME}" \
-    --query 'LoadBalancers[0].DNSName' --output text)
-
 echo ""
 echo "=== Deployment complete! ==="
 echo ""

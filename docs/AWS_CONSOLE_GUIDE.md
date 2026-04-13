@@ -38,7 +38,7 @@ What to do:
      "Statement": [{
        "Effect": "Allow",
        "Action": ["secretsmanager:GetSecretValue"],
-       "Resource": "arn:aws:secretsmanager:us-east-2:151935250464:secret:mytower-registration/db-connection-string*"
+       "Resource": "arn:aws:secretsmanager:us-east-2:<YOUR_ACCOUNT_ID>:secret:mytower-registration/db-connection-string*"
      }]
    }
    ```
@@ -245,7 +245,7 @@ step 9c — accept that if prompted, otherwise:
     "Resource": "arn:aws:s3:::mytower-registration-admin/*",
     "Condition": {
       "StringEquals": {
-        "AWS:SourceArn": "arn:aws:cloudfront::151935250464:distribution/<YOUR_CF_DISTRIBUTION_ID>"
+        "AWS:SourceArn": "arn:aws:cloudfront::<YOUR_ACCOUNT_ID>:distribution/<YOUR_CF_DISTRIBUTION_ID>"
       }
     }
   }]
