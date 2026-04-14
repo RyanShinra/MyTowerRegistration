@@ -24,7 +24,8 @@ It is a companion to [AWS_CONSOLE_GUIDE.md](AWS_CONSOLE_GUIDE.md).
 
 | Resource | Value |
 |---|---|
-| ACM cert ARN | `arn:aws:acm:us-east-1:151935250464:certificate/07a46b81-bf79-4c1d-8319-92f135aa8d4f` |
+| ACM cert ARN (us-east-1, CloudFront) | `arn:aws:acm:us-east-1:151935250464:certificate/07a46b81-bf79-4c1d-8319-92f135aa8d4f` |
+| ACM cert ARN (us-east-2, ALB) | `arn:aws:acm:us-east-2:151935250464:certificate/2b954a54-eba4-43d7-8a6e-89cd1d872496` |
 | ALB DNS name | `mytower-registration-alb-90596354.us-east-2.elb.amazonaws.com` |
 | CloudFront domain | `dlkzg304jfbpr.cloudfront.net` |
 | CloudFront distribution ID | `E20OTOLXT2QXNM` |
@@ -120,23 +121,16 @@ Or use [dnschecker.org](https://dnschecker.org) to check from multiple locations
 
 ## Step 5 — Update deploy.sh ✅ Done
 
-Once DNS is working and HTTPS is confirmed on both subdomains, update
-`scripts/deploy.sh` to replace the dynamic CloudFront lookup with hardcoded constants.
+`scripts/deploy.sh` now uses hardcoded constants for both URLs:
 
-Find the block that reads:
-```bash
-# Once mytower.dev DNS is configured, these become stable constants:
-#   ADMIN_ORIGIN="https://admin.mytower.dev"
-#   API_BASE_URL="https://admin-api.mytower.dev"
-```
-
-And replace the dynamic lookup lines above it with:
 ```bash
 ADMIN_ORIGIN="https://admin.mytower.dev"
 API_BASE_URL="https://admin-api.mytower.dev"
 ```
 
-Remove the dynamic CF_DOMAIN lookup lines — they're no longer needed.
+The dynamic CloudFront domain lookup (`CF_DOMAIN`) that was used before DNS
+was configured has been removed. These constants are stable — they do not
+change when infrastructure is rebuilt.
 
 ---
 

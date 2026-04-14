@@ -161,6 +161,11 @@ is the most involved Console workflow. The wizard guides you through them.
   - HTTP (port 80) from `0.0.0.0/0` (and `::/0` for IPv6 if desired)
   - HTTPS (port 443) from `0.0.0.0/0` ← add this even now; you'll use it for the domain
 
+> **Note:** `setup-infra.sh` intentionally omits port 443 from the ALB security group
+> because the HTTPS listener doesn't exist yet at infra-setup time. If you used the
+> script instead of this Console guide, port 443 is added later in
+> [DOMAIN_SETUP.md step 2b](DOMAIN_SETUP.md#step-2--alb-add-https-listener--http-redirect).
+
 ### 8b. Create the ALB
 
 - Name: `mytower-registration-alb`
@@ -259,15 +264,17 @@ step 9c — accept that if prompted, otherwise:
 These steps have no equivalent in `setup-infra.sh` because they are truly
 one-time and involve external services (Namecheap, ACM).
 
-See the separate [domain setup runbook](DOMAIN_SETUP.md) — or follow the
-steps in this session's notes — for:
+See the separate [domain setup runbook](DOMAIN_SETUP.md) for:
 
-1. Route 53 hosted zone → NS records
-2. Namecheap nameserver swap
-3. ACM wildcard certificate (`*.mytower.dev`) — **must be in us-east-1**
-4. ALB HTTPS listener + HTTP→HTTPS redirect
-5. CloudFront alternate domain + certificate attachment
-6. Route 53 A-alias records
+1. ACM wildcard certificate (`*.mytower.dev`) — free, non-exportable, **must be in us-east-1 for CloudFront** and us-east-2 for ALB
+2. ALB HTTPS listener + HTTP→HTTPS redirect + open port 443 in ALB security group
+3. CloudFront alternate domain + certificate attachment
+4. Namecheap CNAME records pointing `admin-api` → ALB and `admin` → CloudFront
+
+Note: Route 53 is **not used**. CNAME records on Namecheap DNS point directly
+to the ALB and CloudFront hostnames. Route 53 ALIAS records would only be
+needed for the bare apex domain (`mytower.dev` with no subdomain), which is
+not currently in use.
 
 ---
 

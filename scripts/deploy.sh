@@ -298,6 +298,14 @@ dotnet publish ./MyTowerRegistration.Admin/MyTowerRegistration.Admin.csproj \
 echo "Blazor publish complete."
 
 PUBLISHED_APPSETTINGS="./publish/admin/wwwroot/appsettings.json"
+
+# Guard: fail loudly if the key is missing rather than silently creating a
+# new key that Blazor will deserialize as null. jq -e exits non-zero if the
+# result is null or false — same class of bug as the silent-null
+# deserialization trap in C# (see CLAUDE.md).
+jq -e '.ApiBaseUrl' "${PUBLISHED_APPSETTINGS}" > /dev/null \
+    || { echo "ERROR: ApiBaseUrl key missing from ${PUBLISHED_APPSETTINGS} — check the placeholder value"; exit 1; }
+
 jq --arg url "${API_BASE_URL}" '.ApiBaseUrl = $url' "${PUBLISHED_APPSETTINGS}" \
     > "${PUBLISHED_APPSETTINGS}.tmp" && mv "${PUBLISHED_APPSETTINGS}.tmp" "${PUBLISHED_APPSETTINGS}"
 echo "Patched published ApiBaseUrl → ${API_BASE_URL}"

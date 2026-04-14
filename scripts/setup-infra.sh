@@ -421,6 +421,7 @@ if [ "${EXISTING_ALB_SG}" = "None" ] || [ -z "${EXISTING_ALB_SG}" ]; then
         --description "Allow HTTP from internet to MyTowerRegistration ALB" \
         --vpc-id "${VPC_ID}" \
         --query 'GroupId' --output text)
+    [ -n "${ALB_SG_ID}" ] || { echo "ERROR: Failed to get ALB security group ID after creation"; exit 1; }
 
     aws ec2 authorize-security-group-ingress \
         --group-id "${ALB_SG_ID}" \
