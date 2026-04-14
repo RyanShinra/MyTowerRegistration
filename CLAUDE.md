@@ -230,6 +230,69 @@ the Blazor app over HTTPS, `ApiBaseUrl` must also be HTTPS — either route API 
 through the same CloudFront distribution under a `/api/*` behavior, or terminate TLS on
 the ALB directly.
 
+**`jq` silently creates missing keys — guard with `-e` before patching.**
+This is the bash analogue of the C# silent-null deserialization trap above. `jq '.Foo = $val'`
+will *add* `Foo` to the JSON if it doesn't exist, exit 0, and produce a file that looks correct
+but will deserialize as `null` in the consuming app. Always assert the key exists first:
+
+```bash
+# ✗ silently adds ApiBaseUrl if missing — Blazor reads null, no error
+jq --arg url "${API_BASE_URL}" '.ApiBaseUrl = $url' appsettings.json
+
+# ✅ fail loudly if the key is absent
+jq -e '.ApiBaseUrl' appsettings.json > /dev/null \
+    || { echo "ERROR: ApiBaseUrl missing from appsettings.json"; exit 1; }
+jq --arg url "${API_BASE_URL}" '.ApiBaseUrl = $url' appsettings.json
+```
+
+**`aws --output text` returns the literal string `"None"` for empty results — not empty string.**
+When a JMESPath expression matches nothing, `--output text` prints `None` and exits 0.
+An emptiness check with `[ -z ]` will not catch it — check for both:
+
+```bash
+RESULT=$(aws ec2 describe-security-groups \
+    --filters "Name=group-name,Values=${NAME}" \
+    --query 'SecurityGroups[0].GroupId' \
+    --output text 2>/dev/null)
+
+# ✗ misses the "None" case
+[ -z "${RESULT}" ] && echo "not found"
+
+# ✅ catches both empty string and literal "None"
+if [ -z "${RESULT}" ] || [ "${RESULT}" = "None" ]; then
+    echo "not found"
+fi
+```
+
+Prefer `--output json` + `jq` for cleaner empty detection in new code.
+
+**`aws s3 sync` compares by size + last-modified time, not content.**
+If a local file is older than the S3 copy (common when deploying from a second machine),
+`sync` skips it even if the content changed — e.g. `appsettings.json` patched with a
+same-length URL. Fix: delete the local publish output before `dotnet publish` so all
+files get a fresh mtime that is always newer than S3.
+
+```bash
+# ✗ local appsettings.json may be skipped if its mtime predates the S3 copy
+dotnet publish ... --output ./publish/admin
+jq ... appsettings.json  # patch it
+aws s3 sync ./publish/admin/wwwroot s3://bucket/ --delete
+
+# ✅ rm -rf guarantees fresh mtimes on every file
+rm -rf ./publish/admin
+dotnet publish ... --output ./publish/admin
+jq ... appsettings.json
+aws s3 sync ./publish/admin/wwwroot s3://bucket/ --delete
+```
+
+**ACM certificates are regional — CloudFront requires us-east-1, ALB uses its own region.**
+A single cert cannot serve both. When adding a new subdomain that needs HTTPS on both
+CloudFront and an ALB:
+- Request one cert in **us-east-1** for CloudFront
+- Request a separate cert in the **ALB's region** (e.g. us-east-2) for the ALB listener
+- The wildcard `*.mytower.dev` cert covers both — no new cert needed per subdomain,
+  only per region. The DNS validation CNAME is the same for both regions.
+
 **`--export-schema` fast-exit in Program.cs must be preserved across merges.**
 The MSBuild `ExportSchema` target (Debug only) calls `dotnet "$(TargetPath)" --export-schema`
 after every build. Without the fast-exit guard in `Program.cs`, the process starts Kestrel,
