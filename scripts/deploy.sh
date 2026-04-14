@@ -114,10 +114,13 @@ TG_ARN=$(aws elbv2 describe-target-groups \
     --output text 2>/dev/null) \
     || { echo "ERROR: Target group '${TG_NAME}' not found. Run setup-infra.sh first."; exit 1; }
 
-CF_ID=$(aws cloudfront list-distributions \
+CF_IDS=$(aws cloudfront list-distributions \
     --query "DistributionList.Items[?Comment=='MyTowerRegistration Admin'].Id" \
-    --output text 2>/dev/null | awk '{print $1}')
-[ -z "${CF_ID}" ] && { echo "ERROR: CloudFront distribution not found. Run setup-infra.sh first."; exit 1; }
+    --output text 2>/dev/null)
+CF_COUNT=$(echo "${CF_IDS}" | awk 'NF' | wc -l | tr -d ' ')
+[ -z "${CF_IDS}" ] && { echo "ERROR: CloudFront distribution not found. Run setup-infra.sh first."; exit 1; }
+[ "${CF_COUNT}" -gt 1 ] && { echo "ERROR: ${CF_COUNT} CloudFront distributions match 'MyTowerRegistration Admin' — expected exactly 1. Delete the duplicate in the console."; exit 1; }
+CF_ID=$(echo "${CF_IDS}" | awk '{print $1}')
 
 echo "  Secret ARN : ${SECRET_ARN}"
 echo "  Target group: ${TG_ARN}"
@@ -245,6 +248,12 @@ fi
 echo "Migration task: ${MIGRATION_TASK_ARN}"
 echo "Waiting for migrations to complete..."
 
+# aws ecs wait has a hard 10-minute timeout (20 polls × 30s). If migrations
+# exceed this — e.g. a large schema change on a cold t3.micro — the wait exits
+# non-zero and the script aborts even though the task will eventually succeed.
+# If this happens, check the task status manually:
+#   aws ecs describe-tasks --cluster mytower-cluster --tasks <TASK_ARN>
+# and re-run deploy.sh once migrations are confirmed complete.
 aws ecs wait tasks-stopped \
     --cluster "${ECS_CLUSTER}" \
     --tasks "${MIGRATION_TASK_ARN}"
@@ -436,6 +445,14 @@ fi
 
 echo "Waiting for service to reach steady state..."
 
+# Same 10-minute hard timeout as the migrations wait above. On a slow ECR pull
+# or cold start the combined image-pull + ALB health-check grace period (60s)
+# + 2 consecutive healthy checks (another 60s) can approach this limit.
+# If the wait times out, the script exits with an error — but ECS continues
+# its own rolling update independently. Check the real status with:
+#   aws ecs describe-services --cluster mytower-cluster --services mytower-registration-api
+# A RUNNING service with the new task definition revision means the deploy
+# succeeded despite the timeout error.
 aws ecs wait services-stable \
     --cluster "${ECS_CLUSTER}" \
     --services "${API_SERVICE_NAME}"

@@ -602,11 +602,12 @@ fi
 # --- CloudFront distribution -----------------------------------------------
 # PriceClass_100 = US, Canada, Europe only — cheapest tier.
 # CachePolicyId 658327ea... = AWS managed "CachingOptimized" policy.
-# read returns space-separated IDs if the Comment matches multiple
-# distributions (e.g. from a failed prior run). Take only the first.
-EXISTING_CF_ID=$(aws cloudfront list-distributions \
+EXISTING_CF_IDS=$(aws cloudfront list-distributions \
     --query "DistributionList.Items[?Comment=='MyTowerRegistration Admin'].Id" \
-    --output text 2>/dev/null | awk '{print $1}' || echo "")
+    --output text 2>/dev/null || echo "")
+EXISTING_CF_COUNT=$(echo "${EXISTING_CF_IDS}" | awk 'NF' | wc -l | tr -d ' ')
+[ "${EXISTING_CF_COUNT}" -gt 1 ] && { echo "ERROR: ${EXISTING_CF_COUNT} CloudFront distributions match 'MyTowerRegistration Admin' — expected at most 1. Delete the duplicate in the console."; exit 1; }
+EXISTING_CF_ID=$(echo "${EXISTING_CF_IDS}" | awk '{print $1}')
 
 if [ -z "${EXISTING_CF_ID}" ] || [ "${EXISTING_CF_ID}" = "None" ]; then
     CF_OUTPUT=$(aws cloudfront create-distribution --distribution-config "$(cat <<EOF
