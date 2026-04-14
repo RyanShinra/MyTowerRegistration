@@ -108,6 +108,15 @@ SECRET_ARN=$(aws secretsmanager describe-secret \
     --query 'ARN' --output text 2>/dev/null) \
     || { echo "ERROR: Secret '${SECRET_NAME}' not found. Run setup-infra.sh first."; exit 1; }
 
+# Verify the secret contains a real connection string, not the placeholder
+# written by setup-infra.sh before RDS was ready. If this check fails it
+# means setup-infra.sh was interrupted before step 6 — rerun it to finish.
+SECRET_VALUE=$(aws secretsmanager get-secret-value \
+    --secret-id "${SECRET_NAME}" \
+    --query 'SecretString' --output text 2>/dev/null)
+echo "${SECRET_VALUE}" | grep -q '"connectionString":"placeholder"' \
+    && { echo "ERROR: Secret '${SECRET_NAME}' still contains the placeholder connection string. Rerun setup-infra.sh to complete step 6."; exit 1; }
+
 TG_ARN=$(aws elbv2 describe-target-groups \
     --names "${TG_NAME}" \
     --query 'TargetGroups[0].TargetGroupArn' \
@@ -235,6 +244,8 @@ RUN_TASK_OUTPUT=$(aws ecs run-task \
     --launch-type FARGATE \
     --network-configuration "awsvpcConfiguration={subnets=[${SUBNETS_ARRAY[0]}],securityGroups=[${ECS_SG_ID}],assignPublicIp=ENABLED}" \
     --output json)
+    # TODO: use multiple subnets for AZ redundancy once the project grows beyond
+    # a single learning deployment. For now us-east-2a only is intentional.
 
 MIGRATION_TASK_ARN=$(echo "${RUN_TASK_OUTPUT}" | jq -r '.tasks[0].taskArn // empty')
 FAILURES_LEN=$(echo "${RUN_TASK_OUTPUT}" | jq '.failures | length')
@@ -294,11 +305,12 @@ echo "Migrations completed successfully."
 echo ""
 echo "--- Step 4: Building and deploying Blazor Admin ---"
 
-# Clean the output directory first so every file gets a fresh mtime.
-# Without this, s3 sync can skip files whose local mtime is older than the
-# S3 copy — notably appsettings.json, which can change content without
-# changing size (same-length URL), causing the patched value to be silently
-# skipped on cross-machine deploys (e.g. Mac vs WSL).
+# Clean the output directory first so every file gets a fresh mtime that is
+# newer than anything currently in S3. aws s3 sync compares by size AND
+# last-modified time — if a local file is older than the S3 copy, sync skips
+# it even if the content changed (e.g. appsettings.json patched with a
+# same-length URL). Deleting the directory guarantees all local files are
+# freshly stamped by dotnet publish, so sync always uploads everything.
 rm -rf ./publish/admin
 
 dotnet publish ./MyTowerRegistration.Admin/MyTowerRegistration.Admin.csproj \
@@ -430,6 +442,7 @@ if [ -z "${EXISTING_SERVICE}" ]; then
         --desired-count 1 \
         --launch-type FARGATE \
         --network-configuration "awsvpcConfiguration={subnets=[${SUBNETS_ARRAY[0]}],securityGroups=[${ECS_SG_ID}],assignPublicIp=ENABLED}" \
+        # TODO: use multiple subnets for AZ redundancy (see migrations task above).
         --load-balancers "targetGroupArn=${TG_ARN},containerName=api,containerPort=${API_PORT}" \
         --health-check-grace-period-seconds 60 > /dev/null
     echo "ECS service created."

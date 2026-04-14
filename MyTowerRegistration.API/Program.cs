@@ -158,6 +158,12 @@ var app = builder.Build();
 // When invoked with `--export-schema`, writes schema.graphql to the repo root
 // and exits immediately. Kestrel never starts, no port is opened, no DB is touched.
 //
+// NOTE: builder.Build() (above) does not open a DB connection — EF Core's
+// AddDbContext is lazy. However, if appsettings.json contains an unparseable
+// connection string (e.g. a malformed placeholder), EF Core may throw during
+// service resolution before reaching this guard. If --export-schema fails with
+// an EF Core exception, check the connection string placeholder value first.
+//
 // Hot Chocolate builds the schema entirely from service registrations —
 // the HTTP pipeline is irrelevant for schema construction. This is why we can
 // return before the middleware section below ever runs.

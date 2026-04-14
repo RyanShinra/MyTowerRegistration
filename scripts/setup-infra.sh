@@ -236,6 +236,12 @@ VPC_ID=$(aws ec2 describe-security-groups \
     --query 'SecurityGroups[0].VpcId' \
     --output text)
 
+# NOTE: `--output text` with a JMESPath that matches nothing returns the
+# literal string "None" (not empty string) and exits 0. The `|| echo "None"`
+# fallback is therefore dead code — it only fires on a non-zero CLI exit, but
+# the no-result case already produces "None" via --output text. Both paths
+# land in the same if-branch below, so the behaviour is correct either way.
+# TODO: replace with `--output json` + jq for cleaner empty detection.
 EXISTING_RDS_SG=$(aws ec2 describe-security-groups \
     --filters "Name=group-name,Values=${RDS_SG_NAME}" "Name=vpc-id,Values=${VPC_ID}" \
     --query 'SecurityGroups[0].GroupId' \
@@ -358,7 +364,11 @@ else
         --secret-id "${SECRET_NAME}" \
         --secret-string "${SECRET_JSON}"
 
-    # Clear plaintext password from memory
+    # Clear plaintext password from memory.
+    # TODO: unset DB_PASSWORD immediately after the create-db-instance call
+    # (step 5) so it doesn't live in the environment for ~160 lines while
+    # jq, awk, and aws subprocesses are running. Low risk on a dev machine
+    # but worth tightening before any shared/CI use.
     unset DB_PASSWORD
     unset CONNECTION_STRING
     unset SECRET_JSON
