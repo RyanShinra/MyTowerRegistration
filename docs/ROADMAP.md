@@ -17,15 +17,16 @@ the .NET ecosystem — before the game frontends are connected to it.
 
 | Area | What's built |
 |---|---|
-| **API** | GraphQL registration API — register user, query users |
+| **API** | GraphQL registration API — register user, query users, delete users |
 | **Data layer** | EF Core + PostgreSQL, repository pattern, code-first migrations |
 | **Containerisation** | Multi-stage Dockerfile, Docker Compose stack (db + migrations + api) |
-| **Admin UI** | Blazor WASM admin frontend — list and delete users |
+| **Admin UI** | Blazor WASM admin frontend — list, register, and delete users |
 | **AWS deployment** | ECS Fargate + RDS PostgreSQL + Secrets Manager + CloudWatch |
 | **Load balancer** | ALB in front of ECS; stable URL independent of task restarts |
 | **Static hosting** | Blazor admin deployed to S3 + CloudFront (HTTPS, SPA routing) |
-| **Deploy script** | `scripts/deploy-aws.sh` — idempotent, one-command deployment |
-| **Domains** | `mytower.dev` and `mytowergame.com` registered at Namecheap |
+| **Scripts** | `setup-infra.sh` (one-time infra) + `deploy.sh` (repeatable deploys) |
+| **Domains** | `mytower.dev` connected: `admin-api.mytower.dev` → ALB, `admin.mytower.dev` → CloudFront |
+| **TLS** | ACM wildcard cert `*.mytower.dev` — HTTPS enforced end-to-end |
 
 ### Architecture Today
 
@@ -36,32 +37,48 @@ db (Postgres 18)                    RDS PostgreSQL 16
 db-migrations (EF bundle)           ECS one-off task (migrations)
 api (ASP.NET Core + Hot Choc)       ECS Fargate service
                                     ↑
-                                    ALB (stable DNS, health checks)
+                                    ALB (HTTPS:443, HTTP:80 → redirect)
+                                    ↑
+                                    admin-api.mytower.dev (Namecheap CNAME)
 
 admin (Blazor WASM)                 S3 bucket (static files)
                                     ↑
                                     CloudFront (HTTPS, SPA 404→index.html)
+                                    ↑
+                                    admin.mytower.dev (Namecheap CNAME)
 ```
+
+### Subdomain Plan
+
+| Subdomain | Target | Status |
+|---|---|---|
+| `admin-api.mytower.dev` | ALB → ECS (C# GraphQL API) | ✅ Live |
+| `admin.mytower.dev` | CloudFront → S3 (Blazor admin) | ✅ Live |
+| `game.mytower.dev` | TBD — Svelte game frontend | Future |
+| `game-api.mytower.dev` | TBD — Python GraphQL backend | Future |
+
+Note: Route 53 is **not used**. Namecheap CNAME records point directly to the
+ALB and CloudFront hostnames. Route 53 ALIAS records would only be needed for
+the bare apex `mytower.dev`, which is not currently served.
 
 ---
 
 ## What's Next
 
-### Phase 3 — Custom Domains + HTTPS on ALB
+### Phase 4 — Rate Limiting
 
-DNS and TLS are the last step before sharing the service publicly.
+The API is now publicly accessible under a real domain. Before promoting it
+widely, add rate limiting to protect against bots and abuse.
 
-1. Delegate `mytower.dev` nameservers to Route 53
-2. Issue SSL certificate via ACM (`*.mytower.dev` or individual subdomains)
-3. Add HTTPS listener on the ALB; terminate TLS there
-4. DNS records:
-   - `api.mytower.dev` → ALB
-   - `admin.mytower.dev` → CloudFront distribution
-5. Update deploy script to set `ApiBaseUrl` to `https://api.mytower.dev`
-   instead of the CloudFront domain (eliminates the need to route `/api/*`
-   through CloudFront)
+- **Recommended starting point:** ASP.NET Core built-in rate limiting middleware
+  (`Microsoft.AspNetCore.RateLimiting`, available since .NET 7)
+- Apply to the GraphQL endpoint (`/api/graphql`) — fixed window or sliding window
+- Returns `429 Too Many Requests` on violation
+- Static CloudFront assets are served from AWS infrastructure and absorb traffic
+  at scale — rate limiting is only needed on the API side
+- Future: AWS WAF in front of ALB for infrastructure-level protection
 
-### Phase 4 — StrawberryShake Typed GraphQL Client
+### Phase 5 — StrawberryShake Typed GraphQL Client
 
 The Blazor admin currently uses raw `HttpClient` calls with hand-written DTOs.
 StrawberryShake generates strongly-typed C# client code from `schema.graphql`
@@ -70,29 +87,36 @@ at build time — the same pattern as Apollo codegen in the JS ecosystem.
 - Add StrawberryShake to the Admin project
 - Replace raw `HttpClient` calls with generated client
 - `schema.graphql` is already auto-exported on every Debug build
+- DTOs must structurally mirror the GraphQL schema (see CLAUDE.md)
 
-### Phase 5 — Security Hardening
+### Phase 6 — Security Hardening
 
-Before the service is permanently public under a registered domain:
+Before the service handles real user data:
 
 - Replace `Trust Server Certificate=true` with proper RDS CA bundle validation
 - Review IAM permissions (principle of least privilege)
-- Add rate limiting to the registration endpoint
 - Replace SHA-256 password hashing with BCrypt or Argon2 (with salt)
 - Consider adding authentication tokens (JWT) for the game identity flow
+- Fix `read -r` password echo in `setup-infra.sh` (add `-s` flag — see TODO)
+- Move `DB_PASSWORD` unset earlier in `setup-infra.sh` (see TODO)
 
-### Phase 6 — Python Game Frontend + Identity Linking
+### Phase 7 — Python Game Backend
 
 The Python tower game exists as a separate project. The next step is linking
-player identity from the registration DB into the game so that:
+player identity from the registration DB into the game:
 
-- Game progress is tied to a registered account
-- Scores and progress persist across sessions
-- The registration and game backends share a user identity
+- New ECS service for the Python GraphQL API → `game-api.mytower.dev`
+- Shares the same ALB via host-based routing rules (no new ALB needed)
+- The wildcard cert `*.mytower.dev` covers `game-api` automatically
+- Game progress tied to registered accounts, persisted across sessions
 
-The Python game's backend will call `api.mytower.dev` for identity verification.
+### Phase 8 — Svelte Game Frontend
 
-### Phase 7 — iOS and Steam Clients
+- S3 + CloudFront static hosting (same pattern as Blazor admin)
+- `game.mytower.dev` CNAME → new CloudFront distribution
+- New CloudFront distribution (separate from admin, different S3 bucket)
+
+### Phase 9 — iOS and Steam Clients
 
 Once the web frontend and Python game are stable, native clients can be added.
 The GraphQL endpoint is platform-agnostic — no API changes needed for:
@@ -102,14 +126,13 @@ The GraphQL endpoint is platform-agnostic — no API changes needed for:
 
 ---
 
-## Domain Plan
+## Known Tech Debt
 
-| Domain | Purpose |
-|---|---|
-| `mytower.dev` | Infrastructure / API domain |
-| `api.mytower.dev` | Registration API (ALB) |
-| `admin.mytower.dev` | Blazor admin UI (CloudFront) |
-| `mytowergame.com` | Player-facing marketing / landing page |
-
-Both domains are registered at Namecheap. DNS will be delegated to Route 53
-in Phase 3.
+| Item | Location | Notes |
+|---|---|---|
+| `read -r` password echoed to terminal | `setup-infra.sh` | Add `-s` flag for production use |
+| `DB_PASSWORD` lives in env ~160 lines | `setup-infra.sh` | Unset immediately after RDS creation |
+| Single-AZ subnet for ECS tasks | `deploy.sh` | Intentional for now; expand for production |
+| `|| echo "None"` dead code pattern | `setup-infra.sh` | Replace with `--output json` + jq |
+| Placeholder connection string not caught at preflight | `deploy.sh` | Now caught — but secret value is fetched on every deploy |
+| `aws ecs wait` 10-min hard timeout | `deploy.sh` | Documented; no retry logic yet |
