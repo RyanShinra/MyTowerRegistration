@@ -20,7 +20,9 @@
 //   4. Run                                          — app.Run()
 // =============================================================================
 
+using System.Threading.RateLimiting;
 using HotChocolate.Execution;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using MyTowerRegistration.Data;
 using MyTowerRegistration.Data.Repositories;
@@ -142,6 +144,62 @@ builder.Services.AddCors(options =>
     });
 });
 
+// --- Rate Limiting ----------------------------------------------------------
+// ASP.NET Core's built-in rate limiter (System.Threading.RateLimiting, .NET 7+).
+// No NuGet package needed — it ships with the framework.
+//
+// WHY per-IP fixed-window:
+//   - There is no authentication yet, so IP address is the only available key.
+//   - Fixed window is the simplest policy to reason about: each window resets
+//     after WindowSeconds seconds. A sliding window would smooth bursts but
+//     is harder to explain and the difference is minor at these limits.
+//   - QueueLimit = 0: excess requests are rejected immediately (HTTP 429).
+//     Queuing makes sense for paid APIs where you'd rather wait than drop;
+//     for an open registration endpoint, queueing just delays abuse, not stops it.
+//
+// HOW partitioning works:
+//   RateLimitPartition.GetFixedWindowLimiter creates a separate counter per
+//   partition key (here: the client IP). Two different IPs each get their own
+//   independent PermitLimit budget. A single shared global counter would be
+//   exhausted by one heavy client and deny everyone else.
+//
+// CONFIG:
+//   RateLimiting:PermitLimit   — max requests per window (default 30)
+//   RateLimiting:WindowSeconds — window length in seconds (default 60)
+//   Override in ECS via env vars: RateLimiting__PermitLimit, RateLimiting__WindowSeconds
+int permitLimit   = builder.Configuration.GetValue<int>("RateLimiting:PermitLimit",  defaultValue: 30);
+int windowSeconds = builder.Configuration.GetValue<int>("RateLimiting:WindowSeconds", defaultValue: 60);
+
+builder.Services.AddRateLimiter(rateLimiterOptions =>
+{
+    rateLimiterOptions.AddPolicy("GraphQL", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            // LIMITATION: all requests that arrive with no RemoteIpAddress (can
+            // happen in tests and behind some proxies) fall into one shared
+            // "unknown" bucket — a single counter for every such client.
+            // Once an ALB or reverse proxy sits in front, the balancer's IP
+            // becomes every client's RemoteIpAddress and this bucket is
+            // exhausted for everyone at once.
+            // Fix: call app.UseForwardedHeaders() (or configure
+            // ForwardedHeadersOptions) before UseRateLimiter so the
+            // X-Forwarded-For header is unwrapped into RemoteIpAddress
+            // before the limiter reads it.
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit            = permitLimit,
+                Window                 = TimeSpan.FromSeconds(windowSeconds),
+                QueueProcessingOrder   = QueueProcessingOrder.OldestFirst,
+                QueueLimit             = 0,
+            }
+        )
+    );
+
+    // 429 Too Many Requests is the standard HTTP status for rate limit violations.
+    // The default would be 503 Service Unavailable, which misrepresents the cause.
+    rateLimiterOptions.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+});
+
 // Keep OpenAPI support from the template
 builder.Services.AddOpenApi();
 
@@ -229,6 +287,26 @@ if (app.Environment.IsDevelopment())
 // OPTIONS request before the real POST — UseCors handles that response.
 app.UseCors("AdminPolicy");
 
-app.MapGraphQL("/api/graphql");
+// UseRateLimiter must come AFTER UseCors so that CORS preflight OPTIONS
+// responses are sent correctly before the rate limiter has a chance to reject
+// the request. It must come BEFORE MapGraphQL so the limiter runs on every
+// inbound GraphQL operation.
+app.UseRateLimiter();
+
+app.MapGraphQL("/api/graphql").RequireRateLimiting("GraphQL");
 
 app.Run();
+
+// =============================================================================
+// TEST HOOK — WebApplicationFactory visibility
+// =============================================================================
+//
+// Top-level statements in .NET 6+ generate an *internal* implicit Program class.
+// WebApplicationFactory<Program> in the test project can't see internal types, so
+// it fails to find the entry point. This partial class declaration makes Program
+// public without changing any behavior at runtime.
+//
+// The "partial" keyword just means "this is part of the same class defined by
+// the top-level statements above." Adding it here is the idiomatic .NET pattern;
+// the alternative is [assembly: InternalsVisibleTo("...")] in the API csproj.
+public partial class Program { }
