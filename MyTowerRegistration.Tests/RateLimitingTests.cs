@@ -121,7 +121,7 @@ public class RateLimitingTests
         {
             HttpResponseMessage response = await client.PostAsync("/api/graphql", MakeRequest());
 
-            Assert.NotEqual(HttpStatusCode.TooManyRequests, response.StatusCode,
+            Assert.True(response.StatusCode != HttpStatusCode.TooManyRequests,
                 $"Request {requestNumber} of {permitLimit} was unexpectedly rate-limited.");
         }
     }
@@ -140,7 +140,7 @@ public class RateLimitingTests
         for (int requestNumber = 1; requestNumber <= permitLimit; requestNumber++)
         {
             HttpResponseMessage warmup = await client.PostAsync("/api/graphql", MakeRequest());
-            Assert.NotEqual(HttpStatusCode.TooManyRequests, warmup.StatusCode,
+            Assert.True(warmup.StatusCode != HttpStatusCode.TooManyRequests,
                 $"Warmup request {requestNumber} of {permitLimit} was unexpectedly rate-limited.");
         }
 
@@ -187,7 +187,7 @@ public class RateLimitingTests
         for (int requestNumber = 1; requestNumber <= permitLimit; requestNumber++)
         {
             HttpResponseMessage warmup = await client.PostAsync("/api/graphql", MakeRequest());
-            Assert.NotEqual(HttpStatusCode.TooManyRequests, warmup.StatusCode,
+            Assert.True(warmup.StatusCode != HttpStatusCode.TooManyRequests,
                 $"Warmup request {requestNumber} of {permitLimit} was unexpectedly rate-limited.");
         }
 
