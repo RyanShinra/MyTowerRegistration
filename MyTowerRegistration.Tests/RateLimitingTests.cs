@@ -95,6 +95,13 @@ public class RateLimitingTests
     private static StringContent MakeRequest() =>
         new("""{"query":"{ __typename }"}""", Encoding.UTF8, "application/json");
 
+    // Reads the production permit limit from the factory's loaded configuration —
+    // stays in sync with appsettings.json automatically, no separate constant to maintain.
+    private static int ReadPermitLimit(WebApplicationFactory<Program> factory) =>
+        factory.Services
+            .GetRequiredService<IConfiguration>()
+            .GetValue<int>("RateLimiting:PermitLimit", 30);
+
     // -------------------------------------------------------------------------
     // TESTS
     // -------------------------------------------------------------------------
@@ -105,9 +112,7 @@ public class RateLimitingTests
         // Arrange
         await using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient client = factory.CreateClient();
-        int permitLimit = factory.Services
-            .GetRequiredService<IConfiguration>()
-            .GetValue<int>("RateLimiting:PermitLimit", 30);
+        int permitLimit = ReadPermitLimit(factory);
 
         // Act + Assert — every request within the window should pass through.
         // "Non-429" means the rate limiter allowed the request; the response body
@@ -116,7 +121,8 @@ public class RateLimitingTests
         {
             HttpResponseMessage response = await client.PostAsync("/api/graphql", MakeRequest());
 
-            Assert.NotEqual(HttpStatusCode.TooManyRequests, response.StatusCode);
+            Assert.NotEqual(HttpStatusCode.TooManyRequests, response.StatusCode,
+                $"Request {requestNumber} of {permitLimit} was unexpectedly rate-limited.");
         }
     }
 
@@ -126,14 +132,16 @@ public class RateLimitingTests
         // Arrange
         await using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient client = factory.CreateClient();
-        int permitLimit = factory.Services
-            .GetRequiredService<IConfiguration>()
-            .GetValue<int>("RateLimiting:PermitLimit", 30);
+        int permitLimit = ReadPermitLimit(factory);
 
-        // Exhaust the full budget (permitLimit requests allowed, all non-429)
+        // Exhaust the full budget — assert each warmup request passes so that
+        // a misconfigured factory (e.g. rate limiter not wired) fails here with a
+        // clear message rather than a confusing false-positive on the final assertion.
         for (int requestNumber = 1; requestNumber <= permitLimit; requestNumber++)
         {
-            await client.PostAsync("/api/graphql", MakeRequest());
+            HttpResponseMessage warmup = await client.PostAsync("/api/graphql", MakeRequest());
+            Assert.NotEqual(HttpStatusCode.TooManyRequests, warmup.StatusCode,
+                $"Warmup request {requestNumber} of {permitLimit} was unexpectedly rate-limited.");
         }
 
         // Act — this is the (permitLimit + 1)th request in the same window
@@ -174,13 +182,13 @@ public class RateLimitingTests
         // Arrange
         await using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient client = factory.CreateClient();
-        int permitLimit = factory.Services
-            .GetRequiredService<IConfiguration>()
-            .GetValue<int>("RateLimiting:PermitLimit", 30);
+        int permitLimit = ReadPermitLimit(factory);
 
         for (int requestNumber = 1; requestNumber <= permitLimit; requestNumber++)
         {
-            await client.PostAsync("/api/graphql", MakeRequest());
+            HttpResponseMessage warmup = await client.PostAsync("/api/graphql", MakeRequest());
+            Assert.NotEqual(HttpStatusCode.TooManyRequests, warmup.StatusCode,
+                $"Warmup request {requestNumber} of {permitLimit} was unexpectedly rate-limited.");
         }
 
         // Act

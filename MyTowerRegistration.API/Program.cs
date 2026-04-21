@@ -24,6 +24,7 @@ using System.Threading.RateLimiting;
 using HotChocolate.Execution;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using MyTowerRegistration.API;
 using MyTowerRegistration.Data;
 using MyTowerRegistration.Data.Repositories;
 
@@ -163,16 +164,24 @@ builder.Services.AddCors(options =>
 //   independent PermitLimit budget. A single shared global counter would be
 //   exhausted by one heavy client and deny everyone else.
 //
-// CONFIG:
-//   RateLimiting:PermitLimit   — max requests per window (default 30)
-//   RateLimiting:WindowSeconds — window length in seconds (default 60)
+// CONFIG: see RateLimitingOptions.cs — defaults (30 req / 60 s) live there.
 //   Override in ECS via env vars: RateLimiting__PermitLimit, RateLimiting__WindowSeconds
-int permitLimit   = builder.Configuration.GetValue<int>("RateLimiting:PermitLimit",  defaultValue: 30);
-int windowSeconds = builder.Configuration.GetValue<int>("RateLimiting:WindowSeconds", defaultValue: 60);
+//   Both values validated at startup (≥ 1): app refuses to start if either is zero or negative.
+builder.Services.AddOptions<RateLimitingOptions>()
+    .Bind(builder.Configuration.GetSection("RateLimiting"))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+RateLimitingOptions rateLimitCfg =
+    builder.Configuration.GetSection("RateLimiting").Get<RateLimitingOptions>()
+    ?? new RateLimitingOptions();
+
+// Shared between AddPolicy and RequireRateLimiting — one string, no typo risk.
+const string GraphQLRateLimitPolicy = "GraphQL";
 
 builder.Services.AddRateLimiter(rateLimiterOptions =>
 {
-    rateLimiterOptions.AddPolicy("GraphQL", httpContext =>
+    rateLimiterOptions.AddPolicy(GraphQLRateLimitPolicy, httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             // LIMITATION: all requests that arrive with no RemoteIpAddress (can
             // happen in tests and behind some proxies) fall into one shared
@@ -187,17 +196,37 @@ builder.Services.AddRateLimiter(rateLimiterOptions =>
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit            = permitLimit,
-                Window                 = TimeSpan.FromSeconds(windowSeconds),
-                QueueProcessingOrder   = QueueProcessingOrder.OldestFirst,
-                QueueLimit             = 0,
+                PermitLimit = rateLimitCfg.PermitLimit,
+                Window      = TimeSpan.FromSeconds(rateLimitCfg.WindowSeconds),
+                QueueLimit  = 0,
             }
         )
     );
 
-    // 429 Too Many Requests is the standard HTTP status for rate limit violations.
-    // The default would be 503 Service Unavailable, which misrepresents the cause.
-    rateLimiterOptions.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    // OnRejected owns the response — status code, headers, and observability.
+    // Setting RejectionStatusCode instead would not let us add Retry-After or log.
+    rateLimiterOptions.OnRejected = (context, _) =>
+    {
+        // RFC 6585: 429 responses SHOULD include Retry-After so clients know
+        // when to retry rather than hammering the endpoint.
+        // FixedWindowRateLimiter populates MetadataName.RetryAfter with the
+        // time remaining in the current window when it rejects a lease.
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out TimeSpan retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter =
+                ((int)retryAfter.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+
+        ILogger logger = context.HttpContext.RequestServices
+            .GetRequiredService<ILoggerFactory>()
+            .CreateLogger("MyTowerRegistration.RateLimiting");
+        logger.LogWarning("Rate limit exceeded for {IP}",
+            context.HttpContext.Connection.RemoteIpAddress);
+
+        return ValueTask.CompletedTask;
+    };
 });
 
 // Keep OpenAPI support from the template
@@ -293,7 +322,7 @@ app.UseCors("AdminPolicy");
 // inbound GraphQL operation.
 app.UseRateLimiter();
 
-app.MapGraphQL("/api/graphql").RequireRateLimiting("GraphQL");
+app.MapGraphQL("/api/graphql").RequireRateLimiting(GraphQLRateLimitPolicy);
 
 app.Run();
 
