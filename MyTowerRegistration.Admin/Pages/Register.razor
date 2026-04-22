@@ -30,6 +30,17 @@
 
 <h1>Register User</h1>
 
+@* DEAD CODE — successMessage is never set to a non-null value in the current implementation.
+   The StrawberryShake migration replaced the success path with Nav.NavigateTo("/users"),
+   so a user is redirected before this block could ever render.
+
+   The raw HttpClient version set successMessage = $"Registered {username}" here. That
+   pattern made sense when the page stayed mounted on success. With navigation, an in-page
+   success message is redundant — the user lands on /users and sees the new row.
+
+   TODO (next branch): Remove this block and the successMessage field/clear below.
+   Leaving it here as a worked example of how dead UI state accumulates during migrations.
+*@
 @if (successMessage is not null)
 {
     <div class="alert alert-success">@successMessage</div>
@@ -87,7 +98,7 @@
     private RegisterForm formModel = new();
 
     private bool isSubmitting;
-    private string? successMessage;
+    private string? successMessage; // DEAD — never assigned after SS migration; TODO (next branch): remove
     private string? errorMessage;
 
     private async Task HandleSubmit()
@@ -96,7 +107,7 @@
         // so we don't need to manually check formModel.IsValid or similar.
 
         isSubmitting = true;
-        successMessage = null;
+        successMessage = null; // DEAD — see field declaration above; TODO (next branch): remove
         errorMessage = null;
 
         try
