@@ -21,6 +21,7 @@ the .NET ecosystem — before the game frontends are connected to it.
 | **Data layer** | EF Core + PostgreSQL, repository pattern, code-first migrations |
 | **Containerisation** | Multi-stage Dockerfile, Docker Compose stack (db + migrations + api) |
 | **Admin UI** | Blazor WASM admin frontend — list, register, and delete users |
+| **Rate limiting** | ASP.NET Core fixed-window rate limiting on `/api/graphql` (429 on violation) |
 | **AWS deployment** | ECS Fargate + RDS PostgreSQL + Secrets Manager + CloudWatch |
 | **Load balancer** | ALB in front of ECS; stable URL independent of task restarts |
 | **Static hosting** | Blazor admin deployed to S3 + CloudFront (HTTPS, SPA routing) |
@@ -65,18 +66,22 @@ the bare apex `mytower.dev`, which is not currently served.
 
 ## What's Next
 
-### Phase 4 — Rate Limiting
+### ~~Phase 4 — Rate Limiting~~ ✅ Done
 
-The API is now publicly accessible under a real domain. Before promoting it
-widely, add rate limiting to protect against bots and abuse.
+Fixed-window rate limiting applied to `/api/graphql` via ASP.NET Core's built-in
+`Microsoft.AspNetCore.RateLimiting` middleware. Returns `429 Too Many Requests` on
+violation. Future hardening: AWS WAF in front of ALB for infrastructure-level protection.
 
-- **Recommended starting point:** ASP.NET Core built-in rate limiting middleware
-  (`Microsoft.AspNetCore.RateLimiting`, available since .NET 7)
-- Apply to the GraphQL endpoint (`/api/graphql`) — fixed window or sliding window
-- Returns `429 Too Many Requests` on violation
-- Static CloudFront assets are served from AWS infrastructure and absorb traffic
-  at scale — rate limiting is only needed on the API side
-- Future: AWS WAF in front of ALB for infrastructure-level protection
+### Phase 4.5 — UpdateUser (CRUD completion)
+
+The U in CRUD is missing. Before moving to the StrawberryShake migration:
+
+- Add `UpdateUserInput` record and `UpdateUserPayload` type
+- Add `updateUser(input: UpdateUserInput!)` mutation resolver in `UserMutations.cs`
+- Add `UpdateAsync(User user, CancellationToken ct)` to `IUserRepository` and `UserRepository`
+- Add `UpdateUser.graphql` operation file for StrawberryShake
+- Add edit form to Blazor admin UI
+- Unit tests: success path, user-not-found, duplicate username/email on update
 
 ### Phase 5 — StrawberryShake Typed GraphQL Client
 
