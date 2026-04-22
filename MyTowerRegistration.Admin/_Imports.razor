@@ -22,8 +22,17 @@
 @using MyTowerRegistration.Admin
 @using MyTowerRegistration.Admin.Layout
 
-@* Shared raw GraphQL response types — temporary until StrawberryShake replaces them *@
-@using MyTowerRegistration.Admin.GraphQL.Models
+@* StrawberryShake runtime types: IOperationResult<T>, IClientError, etc.
+   These are the wrapper types the client returns from every ExecuteAsync() call.
+   IOperationResult<T> carries both .Data (the typed payload) and .Errors (any
+   top-level GraphQL errors). Always check .Errors before accessing .Data. *@
+@using StrawberryShake
 
-@* TODO: When StrawberryShake codegen runs, add the generated client namespace:
-   @using MyTowerRegistration.Admin.GraphQL *@
+@* StrawberryShake-generated client types: IMyTowerClient, IGetUsersResult, etc.
+   All types that the code generator emits from .graphqlrc.json + *.graphql files
+   live in this namespace. Adding it here makes them available in every .razor file
+   without a per-page @using directive.
+
+   The generator output lives in obj/berry/ at build time — you won't see these
+   files in the project tree, but they are compiled into the assembly. *@
+@using MyTowerRegistration.Admin.GraphQL

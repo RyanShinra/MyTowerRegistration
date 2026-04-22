@@ -10,6 +10,35 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.2" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.2" PrivateAssets="all" />
+    <PackageReference Include="StrawberryShake.Blazor" Version="15.1.14" />
   </ItemGroup>
+
+  <!-- ==========================================================================
+       STRAWBERRY SHAKE CODE GENERATION
+       ==========================================================================
+       StrawberryShake.Blazor includes an MSBuild target (GenerateGraphQLCode) that
+       runs dotnet-graphql.dll before every build. It reads .graphqlrc.json to find:
+         - schema.graphql          ← the type system (what the API offers)
+         - GraphQL/**/*.graphql    ← the executable operations (what we ask for)
+
+       Generated C# lands in obj/Debug|Release/net10.0/berry/ and is compiled
+       into the assembly automatically. Never hand-edit those generated files.
+
+       WHY a local copy of schema.graphql?
+       The API project exports schema.graphql to the repo root via an MSBuild target,
+       but the SS generator resolves the schema path relative to the PROCESS working
+       directory (the NuGet package's build/ folder during MSBuild), not relative to
+       the .graphqlrc.json file. Using "../schema.graphql" points to the wrong place
+       during build. The workaround: keep a local copy, refreshed automatically by
+       the CopySchemaFromRoot target below before each code-gen pass.
+       ========================================================================== -->
+
+  <!-- Keep the local schema.graphql in sync with the root-level exported schema.
+       This runs before GenerateGraphQLCode so the generator always sees the latest
+       schema from the API project. The generated schema.graphql in this directory
+       is a derived artifact — don't edit it by hand. -->
+  <Target Name="CopySchemaFromRoot" BeforeTargets="GenerateGraphQLCode">
+    <Copy SourceFiles="../schema.graphql" DestinationFiles="schema.graphql" />
+  </Target>
 
 </Project>

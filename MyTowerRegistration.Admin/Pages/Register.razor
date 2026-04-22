@@ -1,7 +1,11 @@
 @* =============================================================================
    REGISTER.RAZOR — New User Registration Form
 
-   IMPLEMENT SECOND — Wire up the RegisterUser mutation.
+   What changed from the raw HttpClient version:
+     - @inject HttpClient Http  →  @inject IMyTowerClient Client
+     - Manual JSON POST + string mutation  →  Client.RegisterUser.ExecuteAsync(input)
+     - Hand-written CreateUserResult, RegisterUserPayload records  →  generated types
+     - No [JsonPropertyName], no silent-null deserialization bugs
 
    Blazor forms use EditForm (not plain HTML <form>) to get:
      - Two-way data binding via @bind
@@ -18,17 +22,25 @@
    ============================================================================= *@
 
 @page "/register"
-@inject HttpClient Http
+@inject IMyTowerClient Client
 @* NavigationManager used to redirect to /users after successful registration *@
 @inject NavigationManager Nav
 
 <PageTitle>Register User — MyTower Admin</PageTitle>
 
-@* TODO: Replace HttpClient with StrawberryShake typed client:
-   @inject IMyTowerClient Client *@
-
 <h1>Register User</h1>
 
+@* DEAD CODE — successMessage is never set to a non-null value in the current implementation.
+   The StrawberryShake migration replaced the success path with Nav.NavigateTo("/users"),
+   so a user is redirected before this block could ever render.
+
+   The raw HttpClient version set successMessage = $"Registered {username}" here. That
+   pattern made sense when the page stayed mounted on success. With navigation, an in-page
+   success message is redundant — the user lands on /users and sees the new row.
+
+   TODO (next branch): Remove this block and the successMessage field/clear below.
+   Leaving it here as a worked example of how dead UI state accumulates during migrations.
+*@
 @if (successMessage is not null)
 {
     <div class="alert alert-success">@successMessage</div>
@@ -86,7 +98,7 @@
     private RegisterForm formModel = new();
 
     private bool isSubmitting;
-    private string? successMessage;
+    private string? successMessage; // DEAD — never assigned after SS migration; TODO (next branch): remove
     private string? errorMessage;
 
     private async Task HandleSubmit()
@@ -95,62 +107,25 @@
         // so we don't need to manually check formModel.IsValid or similar.
 
         isSubmitting = true;
-        successMessage = null;
+        successMessage = null; // DEAD — see field declaration above; TODO (next branch): remove
         errorMessage = null;
 
         try
         {
-            // TODO: Replace with StrawberryShake typed call:
-            //   var result = await Client.RegisterUserAsync(new RegisterUserInput
-            //   {
-            //       Username = formModel.Username,
-            //       Email    = formModel.Email,
-            //       Password = formModel.Password
-            //   });
+            // RegisterUserInput is a generated type from the schema's RegisterUserInput
+            // definition. Its property names and types come from the schema, so it can
+            // never drift from what the API expects. Compare to the old approach where
+            // we serialized an anonymous object and hoped the field names matched.
             //
-            //   if (result.Data?.RegisterUser.Errors is { Count: > 0 } errors)
-            //       errorMessage = string.Join(", ", errors.Select(e => e.Message));
-            //   else
-            //       successMessage = $"Registered {result.Data!.RegisterUser.User!.Username}";
-
-            // Temporary: raw GraphQL POST until SS is wired up
-            using var response = await Http.PostAsJsonAsync("api/graphql", new
-            {
-                query = """
-                    mutation RegisterUser($input: RegisterUserInput!) {
-                        registerUser(input: $input) {
-                            user { id username email }
-                            errors { message code }
-                        }
-                    }
-                    """,
-                variables = new
+            // Client.RegisterUser is the generated IRegisterUserMutation.
+            // ExecuteAsync(RegisterUserInput input) sends RegisterUser.graphql.
+            IOperationResult<IRegisterUserResult> result = await Client.RegisterUser.ExecuteAsync(
+                new RegisterUserInput
                 {
-                    input = new
-                    {
-                        username = formModel.Username,
-                        email    = formModel.Email,
-                        password = formModel.Password
-                    }
-                }
-            });
-
-            if (!response.IsSuccessStatusCode)
-            {
-                errorMessage = $"API error: {response.StatusCode}";
-                return;
-            }
-
-            var result = await response.Content
-                .ReadFromJsonAsync<GraphQLResponse<RegisterUserData>>();
-
-            // Check top-level GraphQL errors first (resolver exceptions, auth failures, etc.)
-            // These are distinct from the error-as-data payload errors checked below.
-            if (result is null)
-            {
-                errorMessage = "Failed to parse GraphQL response from API.";
-                return;
-            }
+                    Username = formModel.Username,
+                    Email    = formModel.Email,
+                    Password = formModel.Password
+                });
 
             if (result.Errors is { Count: > 0 } topLevelErrors)
             {
@@ -158,20 +133,31 @@
                 return;
             }
 
-            var payload = result.Data?.RegisterUser;
+            // result.Data is non-null because top-level Errors was empty.
+            // RegisterUser payload follows the error-as-data pattern:
+            //   Success: .User is non-null, .Errors is null
+            //   Failure: .User is null,     .Errors has the validation reasons
+            IRegisterUser_RegisterUser payload = result.Data!.RegisterUser;
 
-            if (payload?.Errors is { Count: > 0 } validationErrors)
+            if (payload.Errors is { Count: > 0 } validationErrors)
             {
-                // The API returns validation errors as data (error-as-data pattern),
-                // not as HTTP errors. We surface them here.
+                // e.Code is CreateUserErrorCode — a generated enum, not a string.
+                // This means misspellings in code that compares error codes become
+                // compile errors rather than silent mismatches at runtime.
                 errorMessage = string.Join(" | ", validationErrors.Select(e => $"{e.Code}: {e.Message}"));
             }
-            else if (payload?.User is not null)
+            else if (payload.User is not null)
             {
                 // Navigate to the user list so the new user is immediately visible.
                 // NavigationManager.NavigateTo() is the Blazor equivalent of
                 // React Router's navigate() or Next.js's router.push().
                 Nav.NavigateTo("/users");
+            }
+            else
+            {
+                // Fallback: server returned HTTP 200, no top-level errors, no payload errors,
+                // and no created user. Unexpected response shape — surface it explicitly.
+                errorMessage = "Registration did not return a result. The user may not have been created.";
             }
         }
         catch (Exception ex)
@@ -209,13 +195,4 @@
         [System.ComponentModel.DataAnnotations.MinLength(8, ErrorMessage = "Password must be at least 8 characters")]
         public string Password { get; set; } = string.Empty;
     }
-
-    // Temporary DTOs — replaced by SS-generated types once codegen runs.
-    // Property names must match the GraphQL response JSON keys (case-insensitive)
-    // because System.Text.Json binds by name with no [JsonPropertyName] attributes here.
-    private record CreateUserResult(int Id, string Username, string Email);
-    private record CreateUserError(string Message, string Code);
-    private record RegisterUserPayload(CreateUserResult? User, List<CreateUserError>? Errors);
-    private record RegisterUserData(RegisterUserPayload RegisterUser);
-    // GraphQLResponse<T> and GraphQLError live in GraphQL/Models/GraphQLResponse.cs
 }
