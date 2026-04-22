@@ -1,0 +1,25 @@
+# DeleteUser — remove a user account by ID.
+#
+# The error-as-data pattern applies here too:
+#   - Success: user is non-null (the deleted user), errors is null
+#   - Failure: user is null, errors contains the reason
+#
+# StrawberryShake generates:
+#   DeleteUserAsync(int id) → IDeleteUserResult
+#   result.Data.DeleteUser.User          ← the deleted user (nullable)
+#   result.Data.DeleteUser.Errors        ← error list (nullable)
+#   result.Data.DeleteUser.Errors[0].Code    ← enum: USER_NOT_FOUND, etc.
+#   result.Data.DeleteUser.Errors[0].Message ← human-readable explanation
+
+mutation DeleteUser($id: Int!) {
+  deleteUser(id: $id) {
+    user {
+      id
+      username
+    }
+    errors {
+      message
+      code
+    }
+  }
+}
