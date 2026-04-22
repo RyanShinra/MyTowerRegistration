@@ -28,6 +28,7 @@ the .NET ecosystem — before the game frontends are connected to it.
 | **Scripts** | `setup-infra.sh` (one-time infra) + `deploy.sh` (repeatable deploys) |
 | **Domains** | `mytower.dev` connected: `admin-api.mytower.dev` → ALB, `admin.mytower.dev` → CloudFront |
 | **TLS** | ACM wildcard cert `*.mytower.dev` — HTTPS enforced end-to-end |
+| **Typed GraphQL client** | StrawberryShake 15.x — `IMyTowerClient` and all operation types generated from `schema.graphql` at build time; raw `HttpClient` DTOs retired |
 
 ### Architecture Today
 
@@ -74,7 +75,7 @@ violation. Future hardening: AWS WAF in front of ALB for infrastructure-level pr
 
 ### Phase 4.5 — UpdateUser (CRUD completion)
 
-The U in CRUD is missing. Before moving to the StrawberryShake migration:
+The U in CRUD is missing:
 
 - Add `UpdateUserInput` record and `UpdateUserPayload` type
 - Add `updateUser(input: UpdateUserInput!)` mutation resolver in `UserMutations.cs`
@@ -83,16 +84,15 @@ The U in CRUD is missing. Before moving to the StrawberryShake migration:
 - Add edit form to Blazor admin UI
 - Unit tests: success path, user-not-found, duplicate username/email on update
 
-### Phase 5 — StrawberryShake Typed GraphQL Client
+### ~~Phase 5 — StrawberryShake Typed GraphQL Client~~ ✅ Done
 
-The Blazor admin currently uses raw `HttpClient` calls with hand-written DTOs.
-StrawberryShake generates strongly-typed C# client code from `schema.graphql`
-at build time — the same pattern as Apollo codegen in the JS ecosystem.
+StrawberryShake 15.x replaces raw `HttpClient` calls with a strongly-typed `IMyTowerClient`
+generated from `schema.graphql` at build time. Operation types (`IGetUsersResult`,
+`IDeleteUserResult`, `IRegisterUserResult`) can never drift from the schema — breaking
+changes are compile errors, not silent null bugs at runtime. The old hand-written DTOs are
+retained as an exhibit in `GraphQL/Models/GraphQLResponse.cs` with `[Obsolete(error: true)]`.
 
-- Add StrawberryShake to the Admin project
-- Replace raw `HttpClient` calls with generated client
-- `schema.graphql` is already auto-exported on every Debug build
-- DTOs must structurally mirror the GraphQL schema (see CLAUDE.md)
+See `docs/LEARNING.md §StrawberryShake Typed Client` for the full migration breadcrumb trail.
 
 ### Phase 6 — Security Hardening
 

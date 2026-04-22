@@ -1,32 +1,37 @@
 @* =============================================================================
    USERS.RAZOR — User List Page
 
-   This page will display all registered users fetched via GraphQL.
+   This page displays all registered users fetched via StrawberryShake.
 
-   IMPLEMENT FIRST — Wire up the GetUsers query using StrawberryShake.
+   What changed from the raw HttpClient version:
+     - @inject HttpClient Http  →  @inject IMyTowerClient Client
+     - Manual JSON POST + string query  →  Client.GetUsers.ExecuteAsync()
+     - Hand-written UserDto, UsersData records  →  generated IGetUsers_Users
+     - Manual null-check deserialization  →  compile-time types from the schema
 
-   The flow once StrawberryShake is set up:
-     1. OnInitializedAsync fires when the component first loads
-     2. It calls the generated MyTowerClient.GetUsersAsync()
-     3. SS sends POST /api/graphql with the GetUsers query
-     4. Results come back as strongly-typed C# objects (IGetUsersResult)
-     5. StateHasChanged() triggers re-render with the data
-     6. The @foreach loop renders a row for each user
+   The loading/error/data pattern itself is unchanged — that's a Blazor idiom,
+   not an HttpClient idiom. Compare to React: useState + useEffect.
 
-   The loading/error/data pattern below is the standard Blazor async data
-   fetching idiom. Compare to React's useState + useEffect pattern,
-   or SvelteKit's load() function.
+   WHY StrawberryShake over raw HttpClient?
+   ─────────────────────────────────────────
+   With raw HttpClient you write the query as a C# string literal. If the schema
+   changes, the string still compiles — you only find out at runtime when the
+   response comes back wrong. SS generates a method per operation from the
+   *.graphql files: if the schema changes (e.g. a field is renamed), the generated
+   method changes too, and your call site breaks at COMPILE TIME.
+
+   Also gone: the DTOs at the bottom of this file. Those private records had to
+   match the GraphQL JSON keys exactly (property name = JSON key, case-insensitive).
+   A drift between the C# name and the schema name caused silent null bugs. SS
+   generates those types FROM the schema, so they can never drift.
    ============================================================================= *@
 
 @page "/users"
-@inject HttpClient Http
+@inject IMyTowerClient Client
 
 <PageTitle>Users — MyTower Admin</PageTitle>
 
 <h1>Users</h1>
-
-@* TODO: Replace HttpClient with StrawberryShake typed client:
-   @inject IMyTowerClient Client *@
 
 @if (isLoading) {
     @* Show a spinner while the GraphQL query is in flight.
@@ -56,13 +61,13 @@ else {
                     <td>@user.Id</td>
                     <td>@user.Username</td>
                     <td>@user.Email</td>
-                    <td>@user.CreatedAt.ToString("yyyy-MM-dd")</td> 
+                    <td>@user.CreatedAt.ToString("yyyy-MM-dd")</td>
                     <td>
                         <button class="btn btn-danger btn-sm"
                                 @onclick="() => HandleDelete(user.Id)"
                                 @disabled="@(deletionId is not null)"
                         >
-                            @(deletionId == user.Id ?  "⏳ Deleting..." : "Delete")
+                            @(deletionId == user.Id ? "⏳ Deleting..." : "Delete")
                         </button>
                     </td>
                 </tr>
@@ -83,19 +88,23 @@ else {
     // When any of these fields change and the component re-renders, Blazor
     // efficiently diffs the virtual DOM and applies only the minimal DOM changes.
     //
-    // This is analogous to React's useState() — but without the setter function.
-    // You just assign the field and call StateHasChanged() if outside an event
-    // handler. Inside event handlers and lifecycle methods, Blazor does it for you.
+    // users is List<IGetUsers_Users> — a generated StrawberryShake interface type
+    // whose properties (Id, Username, Email, CreatedAt) come directly from the
+    // fields selected in GraphQL/GetUsers.graphql. If we ever change the selection
+    // set in that .graphql file, this type updates at the next build.
     // =============================================================================
 
     private bool isLoading = true;
     private string? errorMessage;
-    private List<UserDto> users = new();
+    private List<IGetUsers_Users> users = new();
 
     // deletionId: tracks which row's delete button is in-flight (disables it during the request)
     // deletionErrorMessage: holds any delete error to display in the UI
     private int? deletionId;
     private string? deletionErrorMessage;
+
+    // =============================================================================
+    // LIFECYCLE: OnInitializedAsync
     //
     // This is the primary lifecycle method for async data fetching in Blazor.
     // It runs once when the component is first added to the render tree.
@@ -114,38 +123,29 @@ else {
     protected override async Task OnInitializedAsync()
     {
         try {
-            // TODO: Replace with StrawberryShake typed call:
-            //   IGetUsersResult result = await Client.GetUsersAsync();
-            //   users = result.Users.Select(u => new UserDto(u.Id, u.Username, u.Email, u.CreatedAt)).ToList();
-
-            // Temporary: raw GraphQL POST until SS is wired up
-            using var response = await Http.PostAsJsonAsync("api/graphql", new {
-                query = "{ users { id username email createdAt } }"
-            });
-
-            if (!response.IsSuccessStatusCode) {
-                errorMessage = $"API error: {response.StatusCode}";
-                return;
-            }
-
-            var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<UsersData>>();
-
-            // GraphQL servers often return HTTP 200 even for application-level
-            // errors — those live in the response body's errors collection rather
-            // than solely in the HTTP status code. Non-2xx statuses are already
-            // caught by the IsSuccessStatusCode check above.
-            // A null result means the JSON didn't deserialise at all.
-            if (result is null) {
-                errorMessage = "Failed to parse GraphQL response from API.";
-                return;
-            }
+            // StrawberryShake call: Client.GetUsers is the generated IGetUsersQuery.
+            // ExecuteAsync() sends the GetUsers.graphql operation over HTTP, deserialises
+            // the response into strongly-typed IGetUsersResult, and returns it wrapped in
+            // IOperationResult<IGetUsersResult>.
+            //
+            // IOperationResult<T> has two key members:
+            //   .Errors  — top-level GraphQL errors (auth failures, resolver exceptions)
+            //   .Data    — the typed payload (null when Errors is non-empty)
+            //
+            // GraphQL servers often return HTTP 200 even for application-level errors —
+            // those live in the response body's errors collection. StrawberryShake
+            // surfaces them as IOperationResult.Errors so you don't have to parse JSON.
+            IOperationResult<IGetUsersResult> result = await Client.GetUsers.ExecuteAsync();
 
             if (result.Errors is { Count: > 0 } topLevelErrors) {
                 errorMessage = $"GraphQL error(s): {string.Join("; ", topLevelErrors.Select(e => e.Message))}";
                 return;
             }
 
-            users = result.Data?.Users ?? new List<UserDto>();
+            // result.Data is non-null here because Errors was empty.
+            // Users is IReadOnlyList<IGetUsers_Users> — we ToList() so we can RemoveAll()
+            // later when the user deletes a row without re-fetching the full list.
+            users = result.Data!.Users.ToList();
         }
         catch (Exception ex) {
             errorMessage = $"Failed to load users: {ex.Message}";
@@ -157,66 +157,50 @@ else {
         }
     }
 
-
     private async Task HandleDelete(int userIdToDelete)
     {
-
         if (deletionId is not null) return; // can only delete one at a time
         deletionErrorMessage = null;
-        this.deletionId = userIdToDelete;
+        deletionId = userIdToDelete;
+
         try {
-            // Temporary: raw GraphQL POST until SS is wired up
-            using var response = await Http.PostAsJsonAsync("api/graphql", new {
-                query = """
-                      mutation DeleteUser($id: Int!) {
-                          deleteUser(id: $id) {
-                              user { id username }
-                              errors { message code }
-                          }
-                      }
-                    """,
-                variables = new {
-                    id = userIdToDelete  // use the parameter directly, not this.deletionId (which is nullable)
-                }
-            });
-
-            if (!response.IsSuccessStatusCode) {
-                deletionErrorMessage = $"API error: {response.StatusCode}";
-                return;
-            }
-
-            var result = await response.Content
-                .ReadFromJsonAsync<GraphQLResponse<DeleteUserData>>();
-
-            // Check top-level GraphQL errors first (resolver exceptions, auth failures, etc.)
-            // These are distinct from the error-as-data payload errors checked below.
-            if (result is null) {
-                deletionErrorMessage = "Failed to parse GraphQL response from API.";
-                return;
-            }
+            // Client.DeleteUser is the generated IDeleteUserMutation.
+            // ExecuteAsync(int id) sends DeleteUser.graphql with the id variable.
+            //
+            // The payload follows the error-as-data pattern:
+            //   Success: Data.DeleteUser.User is non-null, Errors is null
+            //   Failure: Data.DeleteUser.User is null,     Errors has the reason
+            //
+            // error.Code is DeleteUserErrorCode — a generated C# enum from the schema.
+            // Before SS this was a raw string, so you could misspell enum values at runtime.
+            IOperationResult<IDeleteUserResult> result = await Client.DeleteUser.ExecuteAsync(userIdToDelete);
 
             if (result.Errors is { Count: > 0 } topLevelErrors) {
                 deletionErrorMessage = $"GraphQL error(s): {string.Join("; ", topLevelErrors.Select(e => e.Message))}";
                 return;
             }
 
-            var payload = result.Data?.DeleteUser;
+            // result.Data is non-null because top-level Errors was empty.
+            IDeleteUser_DeleteUser payload = result.Data!.DeleteUser;
 
-            if (payload?.Errors is { Count: > 0 } validationErrors) {
+            if (payload.Errors is { Count: > 0 } validationErrors) {
                 // The API returns validation errors as data (error-as-data pattern),
                 // not as HTTP errors. We surface them here.
+                // e.Code is DeleteUserErrorCode enum — compare to old code where it was string.
                 deletionErrorMessage = string.Join(" | ", validationErrors.Select(e => $"{e.Code}: {e.Message}"));
             }
-            else if (payload?.User is not null) {
-                this.users.RemoveAll(curUser => curUser.Id == userIdToDelete);
+            else if (payload.User is not null) {
+                // Remove the deleted row from the local list without re-fetching.
+                users.RemoveAll(u => u.Id == userIdToDelete);
             }
             else {
-                // Fallback: the server returned HTTP 200 with no top-level errors, but
-                // the payload had neither a deleted user nor any validation errors.
-                // This shouldn't happen with our resolver, but if it does it means the
-                // response shape didn't match what we expected — surface it rather than
-                // silently doing nothing. StrawberryShake will eliminate this case by
-                // catching shape mismatches at compile time.
+                // Fallback: server returned HTTP 200, no top-level errors, no payload errors,
+                // and no deleted user. This shouldn't happen with our resolver, but if it does
+                // the response shape was unexpected — surface it rather than silently doing nothing.
+                //
+                // This case exists because GraphQL's type system allows nullable payload fields.
+                // StrawberryShake narrows the type to the generated interface but can't guarantee
+                // non-null at compile time for nullable schema fields.
                 deletionErrorMessage = "Delete did not return a result. The user may not have been deleted.";
             }
         }
@@ -224,31 +208,8 @@ else {
             deletionErrorMessage = $"Unexpected error: {ex.Message}";
         }
         finally {
-            this.deletionId = null;
+            deletionId = null;
         }
-
     }
-
-
-    // =============================================================================
-    // LOCAL DTOs — Temporary until StrawberryShake generates these from the schema.
-    //
-    // StrawberryShake will generate strongly-typed classes from the GetUsers.graphql
-    // operation file and schema.graphql. These manual classes go away at that point.
-    // =============================================================================
-
-    private record UserDto(int Id, string Username, string Email, DateTime CreatedAt);
-    private record UsersData(List<UserDto> Users);
-
-    // Temporary DTOs for the deleteUser response — replaced by SS-generated types once codegen runs.
-    // DeletedUserDto is intentionally minimal: the delete mutation only selects { id username }
-    // because we don't need email/createdAt to remove the row from the local list. Reusing the
-    // full UserDto would leave Email and CreatedAt as null/default, which is misleading.
-    // SS will generate a correctly-scoped type from the selection set automatically.
-    private record DeletedUserDto(int Id, string Username);
-    private record DeleteUserError(string Message, string Code); // Code is an enum server-side; string here until SS generates the enum
-    private record DeleteUserPayload(DeletedUserDto? User, List<DeleteUserError>? Errors);
-    private record DeleteUserData(DeleteUserPayload DeleteUser);
-    // GraphQLResponse<T> and GraphQLError live in GraphQL/Models/GraphQLResponse.cs
 }
 @* End @code *@
