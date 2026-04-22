@@ -28,7 +28,6 @@ using MyTowerRegistration.API;
 using MyTowerRegistration.Data;
 using MyTowerRegistration.Data.Repositories;
 
-// TODO: Uncomment these once you've implemented the GraphQL classes:
 using MyTowerRegistration.API.GraphQL.Queries;
 using MyTowerRegistration.API.GraphQL.Mutations;
 using MyTowerRegistration.API.GraphQL.Types;
@@ -41,64 +40,14 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 // =============================================================================
 
 // --- EF Core + PostgreSQL ---------------------------------------------------
-// TODO 1: Register AppDbContext with PostgreSQL
-//
-//   builder.Services.AddDbContext<AppDbContext>(options =>
-//       options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-//
-//   What this does:
-//   - Registers AppDbContext as a "scoped" service (one instance per HTTP request)
-//   - Configures it to use PostgreSQL via the Npgsql provider
-//   - Reads the connection string from appsettings.json → ConnectionStrings.DefaultConnection
-//
-//   Compare to Node.js:
-//     const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-//   But here it's managed by DI — you never manually create/dispose connections.
 builder.Services.AddDbContext<AppDbContext>((DbContextOptionsBuilder options) => {
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
 });
 
 // --- Repository Layer -------------------------------------------------------
-// TODO 2: Register the UserRepository
-//
-//   builder.Services.AddScoped<IUserRepository, UserRepository>();
-//
-//   What this does:
-//   - Maps the interface IUserRepository → concrete class UserRepository
-//   - "Scoped" means one instance per HTTP request (matches DbContext lifetime)
-//   - When Hot Chocolate resolvers ask for IUserRepository, DI creates a UserRepository
-//     and injects the AppDbContext into it automatically
-//
-//   Compare to Node.js:
-//     // In Apollo, you'd set up dataSources or inject via context
-//     context: () => ({ userRepo: new UserRepository(pool) })
-//
-//   Three DI lifetimes in .NET:
-//     Transient → new instance every time (like calling `new` each time)
-//     Scoped    → one instance per request (what we want for DB access)
-//     Singleton → one instance for the app's lifetime (for stateless services)
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 // --- Hot Chocolate GraphQL --------------------------------------------------
-// TODO 3: Register the GraphQL server
-//
-//   builder.Services
-//       .AddGraphQLServer()
-//       .AddQueryType<UserQueries>()
-//       .AddMutationType<UserMutations>()
-//       .AddType<UserType>()
-//       .AddDataLoader<UserBatchDataLoader>();
-//
-//   Compare to Apollo Server:
-//     const server = new ApolloServer({
-//       typeDefs,
-//       resolvers,
-//       dataSources: () => ({ ... })
-//     });
-//
-//   Hot Chocolate v15 NOTE: With [QueryType] and [MutationType] attributes
-//   on your classes, you can alternatively use .AddTypes() to auto-discover
-//   all annotated types. But explicit registration is clearer for learning.
 builder.Services
     .AddGraphQLServer()
     .AddQueryType<UserQueries>()
@@ -301,17 +250,6 @@ if (app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
-// TODO 4: Map the GraphQL endpoint
-//
-//   app.MapGraphQL();
-//
-//   This maps the /graphql endpoint and enables:
-//   - POST /graphql      → query/mutation execution
-//   - GET  /graphql      → serves the Nitro GraphQL IDE (like GraphiQL/Sandbox)
-//   - WebSocket /graphql → subscriptions (not used here)
-//
-//   Compare to Apollo: app.use('/graphql', expressMiddleware(server));
-//   Default path is /graphql. Customize with: app.MapGraphQL("/api/graphql");
 // Apply the CORS policy before mapping endpoints. The browser sends a preflight
 // OPTIONS request before the real POST — UseCors handles that response.
 app.UseCors("AdminPolicy");

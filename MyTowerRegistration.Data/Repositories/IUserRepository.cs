@@ -22,34 +22,19 @@ namespace MyTowerRegistration.Data.Repositories;
 /// </summary>
 public interface IUserRepository
 {
-    // TODO 1: Task<User?> GetByIdAsync(int id)
-    //   - Returns null if not found (that's what the ? means)
-    //   - Compare to: async getById(id: number): Promise<User | null>
     Task<User?> GetByIdAsync(int id, CancellationToken ct);
-
-    // TODO 2: Task<IReadOnlyList<User>> GetAllAsync()
-    //   - Returns all users; IReadOnlyList signals "you get a snapshot, don't modify it"
-    //   - Compare to: async getAll(): Promise<readonly User[]>
     Task<IReadOnlyList<User>> GetAllAsync(CancellationToken ct);
 
-    // TODO 3: Task<IDictionary<int, User>> GetByIdsAsync(IReadOnlyList<int> ids, CancellationToken ct)
-    //   - Batch-fetch by IDs — this powers the DataLoader (N+1 prevention)
-    //   - Returns a dictionary so the DataLoader can map each ID to its User
-    //   - CancellationToken lets ASP.NET Core cancel if the client disconnects
-    //   - Compare to: async getByIds(ids: number[]): Promise<Map<number, User>>
+    // Batch-fetch by IDs — powers the DataLoader to avoid N+1 queries.
+    // Returns a dictionary so each ID maps directly to its User.
     Task<UserByIdDictionary> GetByIdsAsync(IReadOnlyList<int> ids, CancellationToken ct);
 
-    // TODO 4: Task<User> AddAsync(User user)
-    //   - Inserts a new user and returns it (with the DB-generated Id populated)
+    // Returns the inserted user with the DB-generated Id populated.
     Task<User> AddAsync(User user, CancellationToken ct);
 
-    // TODO 5: Task<bool> UsernameExistsAsync(string username)
-    //   - Check for uniqueness before inserting (application-level validation)
-    //   - The DB unique index is a safety net; this gives better error messages
+    // Application-level uniqueness checks — the DB unique index is a safety net,
+    // but these give callers a structured error code rather than a DB exception.
     Task<bool> UsernameExistsAsync(string username, CancellationToken ct);
-
-    // TODO 6: Task<bool> EmailExistsAsync(string email)
-    //   - Same pattern as UsernameExistsAsync
     Task<bool> EmailExistsAsync(string email, CancellationToken ct);
 
     // Returns the deleted User if found and deleted, or null if no such user existed.

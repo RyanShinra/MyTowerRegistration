@@ -28,8 +28,7 @@ public class UserRepositoryTests
     /// </summary>
     private static AppDbContext CreateInMemoryContext()
     {
-        // TODO: Create DbContextOptions with InMemoryDatabase
-           var options = new DbContextOptionsBuilder<AppDbContext>()
+        var options = new DbContextOptionsBuilder<AppDbContext>()
                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
                .Options;
         return new AppDbContext(options);
@@ -38,8 +37,6 @@ public class UserRepositoryTests
     // -------------------------------------------------------------------------
     // TEST 1: AddAsync persists and returns the user
     // -------------------------------------------------------------------------
-    // TODO: Implement
-    //
     [Fact]
     public async Task AddAsync_SavesUserAndAssignsId()
     {
@@ -56,8 +53,6 @@ public class UserRepositoryTests
     // -------------------------------------------------------------------------
     // TEST 2: GetByIdAsync retrieves a saved user
     // -------------------------------------------------------------------------
-    // TODO: Implement
-    //
     [Fact]
     public async Task GetByIdAsync_ExistingUser_ReturnsUser()
     {
@@ -76,8 +71,6 @@ public class UserRepositoryTests
     // -------------------------------------------------------------------------
     // TEST 3: GetByIdAsync returns null for missing user
     // -------------------------------------------------------------------------
-    // TODO: Implement
-    //
     [Fact]
     public async Task GetByIdAsync_NonExistentUser_ReturnsNull()
     {
@@ -92,8 +85,6 @@ public class UserRepositoryTests
     // -------------------------------------------------------------------------
     // TEST 4: UsernameExistsAsync returns true for existing username
     // -------------------------------------------------------------------------
-    // TODO: Implement
-    //
     [Fact]
     public async Task UsernameExistsAsync_ExistingUsername_ReturnsTrue()
     {
@@ -109,8 +100,6 @@ public class UserRepositoryTests
     // -------------------------------------------------------------------------
     // TEST 5: GetByIdsAsync batch-fetches correctly
     // -------------------------------------------------------------------------
-    // TODO: Implement
-    //
     [Fact]
     public async Task GetByIdsAsync_ReturnsMatchingUsers()
     {

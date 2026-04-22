@@ -17,18 +17,6 @@
 
 namespace MyTowerRegistration.API.GraphQL.Types;
 
-// TODO 1: Create a C# record named CreateUserError with two properties:
-//   - string Message
-//   - CreateUserErrorCode Code   ← enum, not string; HC maps this to a GraphQL enum type
-//
-//   Use a record (not a class) because errors are immutable value objects.
-//   Records in C# are like TypeScript's `readonly` types + structural equality.
-//   Syntax: public record CreateUserError(string Message, string Code);
-//
-//   Hot Chocolate auto-maps records to GraphQL types — no ObjectType<T>
-//   descriptor needed for simple DTOs like this. The record properties
-//   become fields automatically.
-
 public enum CreateUserErrorCode
 {
     InvalidEmail,

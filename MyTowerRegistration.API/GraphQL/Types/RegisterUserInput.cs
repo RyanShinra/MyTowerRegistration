@@ -24,16 +24,4 @@
 
 namespace MyTowerRegistration.API.GraphQL.Types;
 
-// TODO 1: Create a C# record named RegisterUserInput with three properties:
-//   - string Username
-//   - string Email
-//   - string Password
-//
 public record RegisterUserInput(string Username, string Email, string Password);
-//
-//   This single line generates:
-//   - A constructor
-//   - Read-only properties
-//   - Value-based equality
-//   - Deconstruction support
-//   Compare to TypeScript: type RegisterUserInput = { readonly username: string; ... }

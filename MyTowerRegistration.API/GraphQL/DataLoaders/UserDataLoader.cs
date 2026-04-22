@@ -31,23 +31,7 @@ namespace MyTowerRegistration.API.GraphQL.DataLoaders;
 /// </summary>
 public class UserBatchDataLoader : BatchDataLoader<int, User>
 {
-    // TODO 1: Add a private readonly field for IUserRepository
     private readonly IUserRepository _repository;
-
-    // TODO 2: Add constructor:
-    //   public UserBatchDataLoader(
-    //       IUserRepository repository,
-    //       IBatchScheduler batchScheduler,
-    //       DataLoaderOptions? options = null)
-    //       : base(batchScheduler, options)
-    //   {
-    //       _repository = repository;
-    //   }
-
-    //
-    //   IBatchScheduler is injected by Hot Chocolate — it controls WHEN
-    //   the batch fires (after all resolvers at the current "level" have
-    //   enqueued their requests).
 
     public UserBatchDataLoader(
         IUserRepository repository, 
@@ -57,20 +41,6 @@ public class UserBatchDataLoader : BatchDataLoader<int, User>
         _repository = repository;
     }
 
-
-    // TODO 3: Override LoadBatchAsync:
-    //   protected override async Task<IReadOnlyDictionary<int, User>> LoadBatchAsync(
-    //       IReadOnlyList<int> keys,
-    //       CancellationToken ct)
-    //   {
-    //       // Delegate to the repository's batch method
-    //       var users = await _repository.GetByIdsAsync(keys, ct);
-    //       return users.AsReadOnly();  // or cast as needed
-    //   }
-    //
-    //   "keys" contains ALL the IDs that were requested during this execution
-    //   level. Instead of 100 individual queries, you get ONE:
-    //     SELECT * FROM "Users" WHERE "Id" IN (1, 2, 3, ...)
 
     protected override async Task<IReadOnlyDictionary<int, User>> LoadBatchAsync(IReadOnlyList<int> userIds, CancellationToken ct)
     {

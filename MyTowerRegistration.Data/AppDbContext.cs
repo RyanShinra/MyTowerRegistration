@@ -20,31 +20,13 @@ namespace MyTowerRegistration.Data;
 /// </summary>
 public class AppDbContext : DbContext
 {
-    // TODO 1: Add constructor that accepts DbContextOptions<AppDbContext>
-    //   - Pass options to the base class: base(options)
-    //   - This is how ASP.NET Core's DI injects the connection string
-    //   - Similar pattern to passing config to a Prisma/Knex client
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
         
     }
 
-    // TODO 2: Add DbSet<User> property named "Users"
-    //   - DbSet<T> is like a "table reference" — it's your query entry point
-    //   - Usage: await _context.Users.FindAsync(id)
-    //   - Compare to Prisma: prisma.user.findUnique(...)
     public DbSet<User> Users { get; set; } = null!;
 
-    // TODO 3: Override OnModelCreating(ModelBuilder modelBuilder)
-    //   - This is the "Fluent API" — an alternative to data annotations for
-    //     configuring the schema. Use it for things annotations can't express.
-    //   - Add a unique index on Username:
-    //       modelBuilder.Entity<User>()
-    //           .HasIndex(u => u.Username)
-    //           .IsUnique();
-    //   - Add a unique index on Email (same pattern)
-    //   - These create UNIQUE constraints in PostgreSQL, enforced at the DB level
-    //   - Compare to Prisma: @@unique([username]) in schema.prisma
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>()

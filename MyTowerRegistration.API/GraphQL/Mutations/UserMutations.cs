@@ -37,46 +37,6 @@ namespace MyTowerRegistration.API.GraphQL.Mutations;
 
 public class UserMutations
 {
-    // TODO 1: Implement RegisterUser
-
-    //   public async Task<RegisterUserPayload> RegisterUser(
-    //       RegisterUserInput input,
-    //       [Service] IUserRepository repository)
-    //   {
-    //       // Step A: Validate email format
-    //       //   - Use a simple check or System.Net.Mail.MailAddress.TryCreate()
-    //       //   - If invalid, return: new RegisterUserPayload(null, [new CreateUserError(...)])
-    //       //   - Error code: "INVALID_EMAIL"
-    //
-    //       // Step B: Check if username is taken
-    //       //   - await repository.UsernameExistsAsync(input.Username)
-    //       //   - If taken, return payload with error code: "USERNAME_TAKEN"
-    //
-    //       // Step C: Check if email is taken
-    //       //   - await repository.EmailExistsAsync(input.Email)
-    //       //   - If taken, return payload with error code: "EMAIL_TAKEN"
-    //
-    //       // Step D: Hash the password
-    //       //   - For this demo, use SHA256 (see helper below)
-    //       //   - PRODUCTION NOTE: use BCrypt or Argon2 instead!
-    //       //   - var hash = HashPassword(input.Password);
-    //
-    //       // Step E: Create the User entity
-    //       //   var user = new User
-    //       //   {
-    //       //       Username = input.Username,
-    //       //       Email = input.Email,
-    //       //       PasswordHash = hash,
-    //       //       CreatedAt = DateTime.UtcNow,
-    //       //   };
-    //
-    //       // Step F: Save via repository
-    //       //   var created = await repository.AddAsync(user);
-    //
-    //       // Step G: Return success payload
-    //       //   return new RegisterUserPayload(created, null);
-    //   }
-
     public async Task<RPayload> RegisterUser(
         RegisterUserInput input, 
         [Service] IUserRepository userRepository,
@@ -126,18 +86,7 @@ public class UserMutations
         return new RPayload(createdUser, null);
     }
 
-    // TODO 2: Add a private static helper for password hashing
-    //
-    //   private static string HashPassword(string password)
-    //   {
-    //       // SHA256 for demo only — NOT production-safe (no salt, too fast)
-    //       var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(password));
-    //       return Convert.ToHexString(bytes).ToLowerInvariant();
-    //   }
-    //
-    //   Why static? It doesn't access instance state — pure function.
-    //   Why private? Internal implementation detail, not part of the API.
-    //   Compare to TS: const hashPassword = (pw: string): string => { ... }
+    // SHA-256 for demo only — NOT production-safe (no salt, too fast). Use BCrypt or Argon2.
     private static string HashPassword(string password)
     {
         byte[] pwBytes = Encoding.UTF8.GetBytes(password);

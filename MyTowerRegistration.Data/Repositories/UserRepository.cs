@@ -28,21 +28,13 @@ namespace MyTowerRegistration.Data.Repositories;
 /// </summary>
 public class UserRepository : IUserRepository
 {
-    // TODO 1: Add a private readonly field: AppDbContext _context
-    //   - Injected via constructor (dependency injection)
-    //   - "Scoped" lifetime means one DbContext per request — important because
-    //     DbContext is NOT thread-safe
     private readonly AppDbContext _context;
 
-    // TODO 2: Add constructor that accepts AppDbContext and stores it in _context
     public UserRepository(AppDbContext context)
     {
         _context = context;
     }
 
-    // TODO 3: Implement GetByIdAsync(int id)
-    //   - Use: await _context.Users.FindAsync(id)
-    //   - FindAsync checks the local cache first, then hits the DB if needed
     public async Task<User?> GetByIdAsync(int id, CancellationToken ct)
     {
         // GOTCHA: FindAsync([id], ct) — the square brackets are required, not style.
@@ -64,20 +56,11 @@ public class UserRepository : IUserRepository
         return await _context.Users.FindAsync([id], ct);
     }
 
-    // TODO 4: Implement GetAllAsync()
-    //   - Use: await _context.Users.ToListAsync()
-    //   - For production, add pagination! This is fine for a demo.
     public async Task<IReadOnlyList<User>> GetAllAsync(CancellationToken ct)
     {
         return await _context.Users.ToListAsync(ct);
     }
 
-    // TODO 5: Implement GetByIdsAsync(IReadOnlyList<int> ids, CancellationToken ct)
-    //   - Use: await _context.Users
-    //              .Where(u => ids.Contains(u.Id))
-    //              .ToDictionaryAsync(u => u.Id, ct)
-    //   - The .Contains() translates to SQL: WHERE "Id" IN (1, 2, 3, ...)
-    //   - This is the batch query that makes DataLoader efficient
     public async Task<UserByIdDictionary> GetByIdsAsync(IReadOnlyList<int> searchIds, CancellationToken ct)
     {
         return await _context.Users
@@ -88,11 +71,6 @@ public class UserRepository : IUserRepository
             }, ct);
     }
 
-    // TODO 6: Implement AddAsync(User user)
-    //   - Use: _context.Users.Add(user);    ← stages the INSERT
-    //          await _context.SaveChangesAsync(); ← executes it
-    //          return user;                  ← Id is now populated by PostgreSQL
-    //   - Note: .Add() is sync (just stages), SaveChangesAsync() is the async part
     public async Task<User> AddAsync(User user, CancellationToken ct)
     {
         _context.Users.Add(user);
@@ -100,16 +78,11 @@ public class UserRepository : IUserRepository
         return user;
     }
 
-    // TODO 7: Implement UsernameExistsAsync(string username)
-    //   - Use: await _context.Users.AnyAsync(u => u.Username == username)
-    //   - AnyAsync is more efficient than CountAsync — it short-circuits
     public async Task<bool> UsernameExistsAsync(string searchUsername, CancellationToken ct)
     {
         return await _context.Users.AnyAsync(user => user.Username == searchUsername, ct);
     }
 
-    // TODO 8: Implement EmailExistsAsync(string email)
-    //   - Same pattern, check u.Email == email
     public async Task<bool> EmailExistsAsync(string searchEmail, CancellationToken ct)
     {
         return await _context.Users.AnyAsync(user => user.Email == searchEmail, ct);

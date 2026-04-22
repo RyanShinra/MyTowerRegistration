@@ -40,8 +40,6 @@ public class UserMutationTests
     // -------------------------------------------------------------------------
     // TEST 1: Successful registration
     // -------------------------------------------------------------------------
-    // TODO: Implement this test
-    //
     [Fact]
     public async Task RegisterUser_WithValidInput_ReturnsUserAndNoErrors()
     {
@@ -71,8 +69,6 @@ public class UserMutationTests
     // -------------------------------------------------------------------------
     // TEST 2: Duplicate username
     // -------------------------------------------------------------------------
-    // TODO: Implement this test
-    //
     [Fact]
     public async Task RegisterUser_WithDuplicateUsername_ReturnsError()
     {
@@ -100,8 +96,6 @@ public class UserMutationTests
     // -------------------------------------------------------------------------
     // TEST 3: Duplicate email
     // -------------------------------------------------------------------------
-    // TODO: Implement this test
-    //
     [Fact]
     public async Task RegisterUser_WithDuplicateEmail_ReturnsError()
     {
@@ -127,8 +121,6 @@ public class UserMutationTests
     // -------------------------------------------------------------------------
     // TEST 4: Invalid email format
     // -------------------------------------------------------------------------
-    // TODO: Implement this test
-    //
     [Fact]
     public async Task RegisterUser_WithInvalidEmail_ReturnsError()
     {
@@ -232,8 +224,6 @@ public class UserMutationTests
     // -------------------------------------------------------------------------
     // TEST 5: Password is hashed (not stored in plaintext)
     // -------------------------------------------------------------------------
-    // TODO: Implement this test
-    //
     [Fact]
     public async Task RegisterUser_PasswordIsHashed_NotStoredPlaintext()
     {

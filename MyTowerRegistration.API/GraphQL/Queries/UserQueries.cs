@@ -34,38 +34,10 @@ namespace MyTowerRegistration.API.GraphQL.Queries;
 
 public class UserQueries
 {
-    // TODO 1: Implement GetUser — single user by ID via DataLoader
-    //
-    //   public async Task<User?> GetUser(int id, UserBatchDataLoader loader)
-    //   {
-    //       return await loader.LoadAsync(id);
-    //   }
-    //
-    //   Key points:
-    //   - Hot Chocolate injects the DataLoader automatically (it's a DI service)
-    //   - loader.LoadAsync(id) doesn't fire immediately — it batches
-    //   - Returns null if not found (matches User? return type → nullable in schema)
-    //   - Method name "GetUser" → schema field name "user" (HC strips "Get" prefix)
-    //
-    //   Compare to Apollo: same as calling dataLoader.load(id) in a resolver
     public async Task<User?> GetUserAsync(int id, UserBatchDataLoader loader, CancellationToken ct)
     {
         return await loader.LoadAsync(id, ct);
     }
-
-    // TODO 2: Implement GetUsers — list all users
-    //
-    //   public async Task<IReadOnlyList<User>> GetUsers(
-    //       [Service] IUserRepository repository)
-    //   {
-    //       return await repository.GetAllAsync();
-    //   }
-    //
-    //   Key points:
-    //   - [Service] attribute tells Hot Chocolate to inject from DI container
-    //   - This is like using @Inject() in NestJS or accessing context.dataSources in Apollo
-    //   - Returns non-nullable list of non-nullable users: [User!]!
-    //   - For production, you'd add pagination (Hot Chocolate has [UsePaging])
 
     public async Task<IReadOnlyList<User>> GetUsersAsync([Service] IUserRepository userRepo, CancellationToken ct)
     {
