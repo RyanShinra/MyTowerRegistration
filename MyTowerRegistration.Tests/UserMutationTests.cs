@@ -51,7 +51,7 @@ public class UserMutationTests
         _mockRepo.Setup(repo => repo.EmailExistsAsync(It.IsAny<string>(), CancellationToken.None))
             .ReturnsAsync(false);
         _mockRepo.Setup(repo => repo.AddAsync(It.IsAny<User>(), CancellationToken.None))
-            .ReturnsAsync((User u) => { u.Id = 1; return u; });
+            .ReturnsAsync((User u, CancellationToken _) => { u.Id = 1; return u; });
 
         var input = new RegisterUserInput("testuser", "test@example.com", "Password123");
 
@@ -244,8 +244,8 @@ public class UserMutationTests
 
         User? capturedUser = null;
         _mockRepo.Setup(repo => repo.AddAsync(It.IsAny<User>(), CancellationToken.None))
-            .Callback<User>(user => capturedUser = user)  // Capture the entity
-            .ReturnsAsync((User u) => u);
+            .Callback<User, CancellationToken>((user, _) => capturedUser = user)
+            .ReturnsAsync((User u, CancellationToken _) => u);
 
         var input = new RegisterUserInput("user", "user@test.com", "MySecret");
 
