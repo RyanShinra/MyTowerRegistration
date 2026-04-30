@@ -109,4 +109,14 @@ public class UserRepository : IUserRepository
             return null;
         }
     }
+
+    public async Task<User?> IUserRepository.UpdateAsync(int id, string? username, string? email, string? passwordHash, CancellationToken ct)
+    {
+        if (username is null && email is null && passwordHash is null) {
+            return null;
+        }
+
+        User? updateTgt = await _context.Users.FindAsync([id], ct); // [id] not id — see GetByIdAsync for the full explanation
+        throw new NotImplementedException();
+    }
 }

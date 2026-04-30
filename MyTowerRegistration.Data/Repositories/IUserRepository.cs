@@ -42,4 +42,10 @@ public interface IUserRepository
     // in the response payload without a separate GetByIdAsync call — which would
     // introduce a TOCTOU (= Time Of Check, Time Of Use) race if another request deleted the same row in between.
     Task<User?> DeleteAsync(int id, CancellationToken ct);
+
+    // Nullable fields for an update. If the field is non-null, the value will be modified. 
+    // If the field is null, nothing will change.
+    // All null parameters is a no-op to the database
+    Task<User?> UpdateAsync(int id, string? username, string? email, string? passwordHash, CancellationToken ct);
+
 }

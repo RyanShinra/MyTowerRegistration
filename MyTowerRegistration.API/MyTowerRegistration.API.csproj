@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <!-- Hot Chocolate GraphQL server for ASP.NET Core (includes Nitro IDE at /graphql) -->
-    <PackageReference Include="HotChocolate.AspNetCore" Version="15.1.12" />
+    <PackageReference Include="HotChocolate.AspNetCore" Version="15.1.15" />
 
     <!-- OpenAPI support (came with the template, keep it) -->
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
@@ -34,8 +34,7 @@
   -->
   <Target Name="ExportSchema" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">
     <Message Text="[ExportSchema] Regenerating schema.graphql..." Importance="normal" />
-    <Exec Command="dotnet &quot;$(TargetPath)&quot; --export-schema"
-          WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <Exec Command="dotnet &quot;$(TargetPath)&quot; --export-schema" WorkingDirectory="$(MSBuildProjectDirectory)" />
   </Target>
 
 </Project>
