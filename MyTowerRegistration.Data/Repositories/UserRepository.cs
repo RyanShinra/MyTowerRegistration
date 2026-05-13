@@ -110,13 +110,25 @@ public class UserRepository : IUserRepository
         }
     }
 
-    public async Task<User?> IUserRepository.UpdateAsync(int id, string? username, string? email, string? passwordHash, CancellationToken ct)
+    public async Task<User?> UpdateAsync(int id, string? username, string? email, string? passwordHash, CancellationToken ct)
     {
-        if (username is null && email is null && passwordHash is null) {
+        User? updateTgt = await _context.Users.FindAsync([id], ct); // [id] not id — see GetByIdAsync for the full explanation
+        if (updateTgt is null) return null;
+
+        if (username is not null) updateTgt.Username = username;
+        if (email is not  null) updateTgt.Email = email;
+        if (passwordHash is not null) updateTgt.PasswordHash = passwordHash;
+
+        try {
+            await _context.SaveChangesAsync(ct);
+            return updateTgt;
+        }
+        catch (DbUpdateConcurrencyException) {
+            // Another request deleted this row between our FindAsync and SaveChangesAsync.
+            // EF expected 1 row affected; got 0. Detach the entity so the change tracker
+            // doesn't hold stale state, then return null to match the "user not found" contract.
+            _context.Entry(updateTgt).State = EntityState.Detached;
             return null;
         }
-
-        User? updateTgt = await _context.Users.FindAsync([id], ct); // [id] not id — see GetByIdAsync for the full explanation
-        throw new NotImplementedException();
     }
 }
