@@ -7,6 +7,7 @@ public enum UpdateUserErrorCode
     UserNotEditable,
     UsernameTaken,
     EmailTaken,
-    UsernameFormatInvalid,
-    EmailFormatInvalid
+    InvalidEmail,
+    InvalidPassword,
+    InvalidUsername
 }
