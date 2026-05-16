@@ -119,6 +119,9 @@ public class UserRepository : IUserRepository
         if (email is not  null) updateTgt.Email = email;
         if (passwordHash is not null) updateTgt.PasswordHash = passwordHash;
 
+        // If all three inputs were null, EF Core's change tracker sees no modified properties
+        // and SaveChangesAsync becomes a no-op (issues no SQL UPDATE). Intentional — the caller
+        // gets back the current user state without us needing a separate "nothing changed" branch.
         try {
             await _context.SaveChangesAsync(ct);
             return updateTgt;
