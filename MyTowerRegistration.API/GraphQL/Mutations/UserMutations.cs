@@ -61,22 +61,29 @@ public class UserMutations
 
             if (username.Length < 3 || username.Length > 20)
                 return new UserValidationError("Username must be between 3 and 20 characters", UserFieldValidationError.InvalidUsername);
-
-            if (await userRepository.UsernameExistsAsync(username, ct))
-                return new UserValidationError("Username already in use", UserFieldValidationError.UsernameTaken);
         }
 
         if (email is not null) {
             if (!System.Net.Mail.MailAddress.TryCreate(email, out _))
                 return new UserValidationError("Invalid e-mail address", UserFieldValidationError.InvalidEmail);
-
-            if (await userRepository.EmailExistsAsync(email, ct))
-                return new UserValidationError("Email already in use", UserFieldValidationError.EmailTaken);
         }
 
         if (password is not null) {
             // TODO: Consider password validation rules
         }
+
+        // This second block for username is so that all the database reads happen after all the syntax checks
+        if (username is not null) {
+            if (await userRepository.UsernameExistsAsync(username, ct))
+                return new UserValidationError("Username already in use", UserFieldValidationError.UsernameTaken);
+        }
+
+        if (email is not null) {
+            if (await userRepository.EmailExistsAsync(email, ct))
+                return new UserValidationError("Email already in use", UserFieldValidationError.EmailTaken);
+        }
+
+
 
         return null;
     }
