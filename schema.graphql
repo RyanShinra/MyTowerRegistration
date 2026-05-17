@@ -29,6 +29,16 @@ type RegisterUserPayload {
   errors: [CreateUserError!]
 }
 
+type UpdateUserError {
+  message: String!
+  code: UpdateUserErrorCode!
+}
+
+type UpdateUserPayload {
+  user: User
+  errors: [UpdateUserError!]
+}
+
 "A registered user"
 type User {
   id: Int!
@@ -40,6 +50,7 @@ type User {
 type UserMutations {
   registerUser(input: RegisterUserInput!): RegisterUserPayload! @cost(weight: "10")
   deleteUser(id: Int!): DeleteUserPayload! @cost(weight: "10")
+  updateUser(input: UpdateUserInput!): UpdateUserPayload! @cost(weight: "10")
 }
 
 type UserQueries {
@@ -51,6 +62,13 @@ input RegisterUserInput {
   username: String!
   email: String!
   password: String!
+}
+
+input UpdateUserInput {
+  id: Int!
+  username: String
+  email: String
+  password: String
 }
 
 enum CreateUserErrorCode {
@@ -67,6 +85,17 @@ enum DeleteUserErrorCode {
   UNAUTHORIZED_ACCESS
   UNAUTHORIZED_DELETION
   UNKNOWN
+}
+
+enum UpdateUserErrorCode {
+  USER_NOT_FOUND
+  UNAUTHORIZED_ACCESS
+  USER_NOT_EDITABLE
+  USERNAME_TAKEN
+  EMAIL_TAKEN
+  INVALID_EMAIL
+  INVALID_PASSWORD
+  INVALID_USERNAME
 }
 
 "The purpose of the `cost` directive is to define a `weight` for GraphQL types, fields, and arguments. Static analysis can use these weights when calculating the overall cost of a query or response."

@@ -109,4 +109,29 @@ public class UserRepository : IUserRepository
             return null;
         }
     }
+
+    public async Task<User?> UpdateAsync(int id, string? username, string? email, string? passwordHash, CancellationToken ct)
+    {
+        User? updateTgt = await _context.Users.FindAsync([id], ct); // [id] not id — see GetByIdAsync for the full explanation
+        if (updateTgt is null) return null;
+
+        if (username is not null) updateTgt.Username = username;
+        if (email is not  null) updateTgt.Email = email;
+        if (passwordHash is not null) updateTgt.PasswordHash = passwordHash;
+
+        // If all three inputs were null, EF Core's change tracker sees no modified properties
+        // and SaveChangesAsync becomes a no-op (issues no SQL UPDATE). Intentional — the caller
+        // gets back the current user state without us needing a separate "nothing changed" branch.
+        try {
+            await _context.SaveChangesAsync(ct);
+            return updateTgt;
+        }
+        catch (DbUpdateConcurrencyException) {
+            // Another request deleted this row between our FindAsync and SaveChangesAsync.
+            // EF expected 1 row affected; got 0. Detach the entity so the change tracker
+            // doesn't hold stale state, then return null to match the "user not found" contract.
+            _context.Entry(updateTgt).State = EntityState.Detached;
+            return null;
+        }
+    }
 }

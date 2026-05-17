@@ -5,7 +5,7 @@ WORKDIR /src
 # Copy solution and project files first (layer caching for restore)
 # Adding dotnet-tools.json here means tool restore is also cached until
 # tool versions change — same principle as caching NuGet packages separately.
-COPY dotnet-tools.json .
+COPY .config/dotnet-tools.json .config/
 COPY MyTowerRegistration.sln .
 COPY MyTowerRegistration.API/MyTowerRegistration.API.csproj MyTowerRegistration.API/
 COPY MyTowerRegistration.Data/MyTowerRegistration.Data.csproj MyTowerRegistration.Data/

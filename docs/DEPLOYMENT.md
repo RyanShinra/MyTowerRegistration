@@ -19,7 +19,7 @@ The best option when you want to set a breakpoint, step through resolver logic, 
 3. **PostgreSQL** running locally on port 5432
    - Windows installer: [postgresql.org/download/windows](https://www.postgresql.org/download/windows/) (includes pgAdmin)
    - Remember the `postgres` password you set during installation
-4. **CLI tools** — restored from `dotnet-tools.json` (see First-Time Setup step 0).
+4. **CLI tools** — restored from `.config/dotnet-tools.json` (see First-Time Setup step 0).
    If you prefer a global install instead:
    ```bash
    dotnet tool install --global dotnet-ef --version 10.0.0
@@ -31,11 +31,9 @@ The best option when you want to set a breakpoint, step through resolver logic, 
 
 From the solution root (once per machine, or after a fresh clone):
 ```bash
-dotnet tool restore --tool-manifest dotnet-tools.json
+dotnet tool restore
 ```
-This installs `dotnet-ef` and any other tools listed in `dotnet-tools.json`.
-The `--tool-manifest` flag is needed because the manifest lives at the repo root
-rather than the standard `.config/dotnet-tools.json` location.
+This installs `dotnet-ef` and any other tools listed in `.config/dotnet-tools.json`.
 Unlike NuGet packages, CLI tools are not restored automatically by `dotnet build`.
 
 **1. Create the database**
