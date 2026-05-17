@@ -258,7 +258,6 @@ public class UserMutationTests : IDisposable
     // TEST: UpdateUser — success path
     // -------------------------------------------------------------------------
     [Fact]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0090:Use 'new(...)'", Justification = "<Pending>")]
     public async Task UpdateUser_WithValidInput_ReturnsUpdatedUserAndNoErrors()
     {
         // Arrange: _testUser is notionally already in the DB — UpdateAsync returns it on success.
