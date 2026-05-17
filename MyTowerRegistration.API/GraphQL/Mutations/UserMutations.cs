@@ -145,9 +145,9 @@ public class UserMutations
 
         if (await ValidateUserFields(input.Username, input.Email, input.Password, userRepository, ct) is { } failedField) {
             return failedField.ErrorCode switch {
-                UserFieldValidationError.InvalidPassword => ErrorPayload(failedField.Message, UpdateUserErrorCode.InvalidPassword),
-                UserFieldValidationError.InvalidEmail => ErrorPayload(failedField.Message, UpdateUserErrorCode.InvalidEmail),
                 UserFieldValidationError.InvalidUsername => ErrorPayload(failedField.Message, UpdateUserErrorCode.InvalidUsername),
+                UserFieldValidationError.InvalidEmail => ErrorPayload(failedField.Message, UpdateUserErrorCode.InvalidEmail),
+                UserFieldValidationError.InvalidPassword => ErrorPayload(failedField.Message, UpdateUserErrorCode.InvalidPassword),
                 UserFieldValidationError.UsernameTaken => ErrorPayload(failedField.Message, UpdateUserErrorCode.UsernameTaken),
                 UserFieldValidationError.EmailTaken => ErrorPayload(failedField.Message, UpdateUserErrorCode.EmailTaken),
                 _ => throw new UnreachableException($"Unknown UserFieldValidationError: {failedField.ErrorCode}")
