@@ -287,6 +287,54 @@ public class UserRepositoryTests
     }
 
     // -------------------------------------------------------------------------
+    // TEST 13: EmailExistsAsync returns true for existing email, false otherwise
+    // -------------------------------------------------------------------------
+    [Fact]
+    public async Task EmailExistsAsync_ExistingEmail_ReturnsTrueOtherwiseFalse()
+    {
+        using var ctx = CreateInMemoryContext();
+        var repo = new UserRepository(ctx);
+
+        await repo.AddAsync(
+            new User { Username = "u", Email = "exists@test.com", PasswordHash = "h" },
+            CancellationToken.None);
+
+        Assert.True(await repo.EmailExistsAsync("exists@test.com", CancellationToken.None));
+        Assert.False(await repo.EmailExistsAsync("nope@test.com", CancellationToken.None));
+    }
+
+    // -------------------------------------------------------------------------
+    // TEST 14: GetAllAsync returns all seeded users
+    // -------------------------------------------------------------------------
+    [Fact]
+    public async Task GetAllAsync_ReturnsAllUsers()
+    {
+        using var ctx = CreateInMemoryContext();
+        var repo = new UserRepository(ctx);
+
+        await repo.AddAsync(new User { Username = "a", Email = "a@test.com", PasswordHash = "h" }, CancellationToken.None);
+        await repo.AddAsync(new User { Username = "b", Email = "b@test.com", PasswordHash = "h" }, CancellationToken.None);
+
+        IReadOnlyList<User> result = await repo.GetAllAsync(CancellationToken.None);
+
+        Assert.Equal(2, result.Count);
+    }
+
+    // -------------------------------------------------------------------------
+    // TEST 15: GetAllAsync on an empty database returns an empty list, not null
+    // -------------------------------------------------------------------------
+    [Fact]
+    public async Task GetAllAsync_EmptyDatabase_ReturnsEmptyList()
+    {
+        using var ctx = CreateInMemoryContext();
+        var repo = new UserRepository(ctx);
+
+        IReadOnlyList<User> result = await repo.GetAllAsync(CancellationToken.None);
+
+        Assert.Empty(result);
+    }
+
+    // -------------------------------------------------------------------------
     // Helper: subclass that overrides SaveChangesAsync to throw
     // DbUpdateConcurrencyException, simulating a concurrent row deletion between
     // FindAsync and SaveChangesAsync without needing a real database.
