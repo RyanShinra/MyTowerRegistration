@@ -174,12 +174,9 @@ public class UserMutationTests : IDisposable
         // Act: Delete the user
         DeleteUserPayload result = await _mutations.DeleteUser(_testUser.Id, _mockRepo.Object, CancellationToken.None);
 
-        // Assert — The user should be not null with matching fields, the error property should be null (i.e. deleted successfully)
+        // Assert — resolver must return the exact repo object, not a reconstruction
         Assert.Null(result.Errors);
-        Assert.NotNull(result.User);
-        Assert.Equal(_testUser.Id, result.User.Id);
-        Assert.Equal(_testUser.Username, result.User.Username);
-        Assert.Equal(_testUser.Email, result.User.Email);
+        Assert.Same(_testUser, result.User);
     }
 
     // -------------------------------------------------------------------------
