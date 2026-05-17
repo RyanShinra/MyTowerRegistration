@@ -3,8 +3,8 @@
 public enum UpdateUserErrorCode
 {
     UserNotFound,
-    UnauthorizedAccess,
-    UserNotEditable,
+    UnauthorizedAccess,  // reserved — auth not yet implemented
+    UserNotEditable,     // reserved — for system/immutable users
     UsernameTaken,
     EmailTaken,
     InvalidEmail,

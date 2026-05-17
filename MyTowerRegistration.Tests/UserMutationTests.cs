@@ -364,9 +364,8 @@ public class UserMutationTests : IDisposable
 
     // -------------------------------------------------------------------------
     // TEST: UpdateUser — partial update (only some fields provided)
-    // When providing only an email to update, only the email is validated against the DB
-    // Also, since no username is provided, Assert that the username is not checked against the DB
-    // Also, also, confirm that the repo update method is called correctly with only user ID and new Email
+    // Providing only an email: validates the email against the DB, skips the username
+    // existence check entirely, and passes only the ID and new email to the repo.
     // -------------------------------------------------------------------------
     [Fact]
     public async Task UpdateUser_WithPartialInput_OnlyValidatesAndUpdatesProvidedFields()

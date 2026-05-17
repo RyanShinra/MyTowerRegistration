@@ -159,6 +159,6 @@ public class UserMutations
         if (updatedUser is null)
             return ErrorPayload("User not found", UpdateUserErrorCode.UserNotFound);
 
-        return new UpdateUserPayload(updatedUser, null);   
+        return new UpdateUserPayload(updatedUser, null);
     }
 }
