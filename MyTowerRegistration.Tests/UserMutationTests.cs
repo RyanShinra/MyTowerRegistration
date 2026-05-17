@@ -269,10 +269,10 @@ public class UserMutationTests : IDisposable
 
         UpdateUserPayload result = await _mutations.UpdateUser(input, _mockRepo.Object, CancellationToken.None);
 
-        // Assert
+        // Assert — same reference (no copy made) and fields unmodified (resolver didn't mutate before returning)
         Assert.Null(result.Errors);
-        Assert.NotNull(result.User);
         Assert.Same(_testUser, result.User);
+        Assert.Equivalent(_testUser, result.User);
 
         _mockRepo.Verify(repo => repo.UpdateAsync(_testUser.Id, _testUser.Username, _testUser.Email, null, CancellationToken.None),
             Times.Once);
