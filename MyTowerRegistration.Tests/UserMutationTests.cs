@@ -154,8 +154,9 @@ public class UserMutationTests : IDisposable
         Assert.Collection(result.Errors,
             errorZero => Assert.Equal(CreateUserErrorCode.InvalidEmail, errorZero.Code));
 
-        // No DB calls should happen for a validation failure
-        _mockRepo.Verify(repo => repo.UsernameExistsAsync(It.IsAny<string>(), CancellationToken.None), Times.Never);
+        // No DB calls should happen for a format-check failure — both existence checks must be skipped
+        _mockRepo.Verify(repo => repo.UsernameExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockRepo.Verify(repo => repo.EmailExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     // -------------------------------------------------------------------------
