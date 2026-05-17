@@ -123,8 +123,8 @@ public class UserRepositoryTests
     [Fact]
     public async Task DeleteAsync_ExistingUser_RemovesAndReturnsUser()
     {
-        using var ctx = CreateInMemoryContext();
-        var repo = new UserRepository(ctx);
+        using var context = CreateInMemoryContext();
+        var repo = new UserRepository(context);
 
         User added = await repo.AddAsync(
             new User { Username = "delete_me", Email = "d@d.com", PasswordHash = "h" },
@@ -143,8 +143,8 @@ public class UserRepositoryTests
     [Fact]
     public async Task DeleteAsync_NonExistentUser_ReturnsNull()
     {
-        using var ctx = CreateInMemoryContext();
-        var repo = new UserRepository(ctx);
+        using var context = CreateInMemoryContext();
+        var repo = new UserRepository(context);
 
         User? result = await repo.DeleteAsync(999, CancellationToken.None);
 
@@ -168,15 +168,15 @@ public class UserRepositoryTests
 
         // Seed using a short-lived context so it's flushed before the throwing context opens
         User seeded;
-        using (var freshCtx = new AppDbContext(options))
+        using (var freshContext = new AppDbContext(options))
         {
-            seeded = await new UserRepository(freshCtx).AddAsync(
+            seeded = await new UserRepository(freshContext).AddAsync(
                 new User { Username = "race", Email = "r@r.com", PasswordHash = "h" },
                 CancellationToken.None);
         }
 
-        using var throwingCtx = new ThrowOnSaveContext(options);
-        var throwingRepo = new UserRepository(throwingCtx);
+        using var throwingContext = new ThrowOnSaveContext(options);
+        var throwingRepo = new UserRepository(throwingContext);
 
         // If the exception escapes the catch block, Record.ExceptionAsync captures it
         // so the test fails with a clear message rather than an unhandled exception crash
@@ -187,7 +187,7 @@ public class UserRepositoryTests
 
         // The entity must be evicted from the change tracker so the context isn't
         // left holding a stale Deleted entry that could confuse subsequent operations
-        Assert.Empty(throwingCtx.ChangeTracker.Entries());
+        Assert.Empty(throwingContext.ChangeTracker.Entries());
     }
 
     // -------------------------------------------------------------------------
@@ -196,8 +196,8 @@ public class UserRepositoryTests
     [Fact]
     public async Task UpdateAsync_ExistingUser_UpdatesOnlyNonNullFields()
     {
-        using var ctx = CreateInMemoryContext();
-        var repo = new UserRepository(ctx);
+        using var context = CreateInMemoryContext();
+        var repo = new UserRepository(context);
 
         User added = await repo.AddAsync(
             new User { Username = "original", Email = "original@test.com", PasswordHash = "oldhash" },
@@ -217,8 +217,8 @@ public class UserRepositoryTests
     [Fact]
     public async Task UpdateAsync_NonExistentUser_ReturnsNull()
     {
-        using var ctx = CreateInMemoryContext();
-        var repo = new UserRepository(ctx);
+        using var context = CreateInMemoryContext();
+        var repo = new UserRepository(context);
 
         User? result = await repo.UpdateAsync(999, "newname", null, null, CancellationToken.None);
 
@@ -235,8 +235,8 @@ public class UserRepositoryTests
     [Fact]
     public async Task UpdateAsync_AllNullFields_ReturnsUserUnchanged()
     {
-        using var ctx = CreateInMemoryContext();
-        var repo = new UserRepository(ctx);
+        using var context = CreateInMemoryContext();
+        var repo = new UserRepository(context);
 
         User added = await repo.AddAsync(
             new User { Username = "stays", Email = "stays@test.com", PasswordHash = "stayshash" },
@@ -266,15 +266,15 @@ public class UserRepositoryTests
             .UseInMemoryDatabase(dbName).Options;
 
         User seeded;
-        using (var freshCtx = new AppDbContext(options))
+        using (var freshContext = new AppDbContext(options))
         {
-            seeded = await new UserRepository(freshCtx).AddAsync(
+            seeded = await new UserRepository(freshContext).AddAsync(
                 new User { Username = "race", Email = "r@r.com", PasswordHash = "h" },
                 CancellationToken.None);
         }
 
-        using var throwingCtx = new ThrowOnSaveContext(options);
-        var throwingRepo = new UserRepository(throwingCtx);
+        using var throwingContext = new ThrowOnSaveContext(options);
+        var throwingRepo = new UserRepository(throwingContext);
 
         Exception? escaped = await Record.ExceptionAsync(
             () => throwingRepo.UpdateAsync(seeded.Id, "newname", null, null, CancellationToken.None));
@@ -283,7 +283,7 @@ public class UserRepositoryTests
 
         // Entity must be evicted — it was mutated in memory before save failed,
         // so leaving it tracked would risk those changes leaking into a future save
-        Assert.Empty(throwingCtx.ChangeTracker.Entries());
+        Assert.Empty(throwingContext.ChangeTracker.Entries());
     }
 
     // -------------------------------------------------------------------------
@@ -292,8 +292,8 @@ public class UserRepositoryTests
     [Fact]
     public async Task EmailExistsAsync_ExistingEmail_ReturnsTrueOtherwiseFalse()
     {
-        using var ctx = CreateInMemoryContext();
-        var repo = new UserRepository(ctx);
+        using var context = CreateInMemoryContext();
+        var repo = new UserRepository(context);
 
         await repo.AddAsync(
             new User { Username = "u", Email = "exists@test.com", PasswordHash = "h" },
@@ -309,8 +309,8 @@ public class UserRepositoryTests
     [Fact]
     public async Task GetAllAsync_ReturnsAllUsers()
     {
-        using var ctx = CreateInMemoryContext();
-        var repo = new UserRepository(ctx);
+        using var context = CreateInMemoryContext();
+        var repo = new UserRepository(context);
 
         await repo.AddAsync(new User { Username = "a", Email = "a@test.com", PasswordHash = "h" }, CancellationToken.None);
         await repo.AddAsync(new User { Username = "b", Email = "b@test.com", PasswordHash = "h" }, CancellationToken.None);
@@ -326,8 +326,8 @@ public class UserRepositoryTests
     [Fact]
     public async Task GetAllAsync_EmptyDatabase_ReturnsEmptyList()
     {
-        using var ctx = CreateInMemoryContext();
-        var repo = new UserRepository(ctx);
+        using var context = CreateInMemoryContext();
+        var repo = new UserRepository(context);
 
         IReadOnlyList<User> result = await repo.GetAllAsync(CancellationToken.None);
 
