@@ -1,0 +1,27 @@
+# UpdateUser — modify a user's username, email, and/or password.
+#
+# Patch semantics: only non-null fields are applied. Omit a field entirely
+# (or pass null) to leave it unchanged. All three nullable means this is
+# a no-op, which the resolver handles gracefully.
+#
+# StrawberryShake generates:
+#   UpdateUserAsync(int id, string? username, string? email, string? password)
+#     → IUpdateUserResult
+#   result.Data.UpdateUser.User          ← the updated user (nullable)
+#   result.Data.UpdateUser.Errors        ← error list (nullable)
+#   result.Data.UpdateUser.Errors[0].Code    ← enum: USERNAME_TAKEN, etc.
+#   result.Data.UpdateUser.Errors[0].Message ← human-readable explanation
+
+mutation UpdateUser($id: Int!, $username: String, $email: String, $password: String) {
+  updateUser(input: { id: $id, username: $username, email: $email, password: $password }) {
+    user {
+      id
+      username
+      email
+    }
+    errors {
+      message
+      code
+    }
+  }
+}
