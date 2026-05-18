@@ -28,6 +28,8 @@
 
 @page "/users"
 @inject IMyTowerClient Client
+@* IJSRuntime: needed to call Bootstrap's modal JS API (show/hide) *@
+@inject IJSRuntime JS
 
 <PageTitle>Users — MyTower Admin</PageTitle>
 
@@ -50,6 +52,7 @@ else {
                 <th>Username</th>
                 <th>Email</th>
                 <th>Registered</th>
+                <th>Edit User</th>
                 <th>Remove User</th>
             </tr>
         </thead>
@@ -63,6 +66,13 @@ else {
                     <td>@user.Email</td>
                     <td>@user.CreatedAt.ToString("yyyy-MM-dd")</td>
                     <td>
+                        @* TODO: Render an Edit / Close toggle button.
+                           - If editingUserId == user.Id, show "Close" and call CancelEdit()
+                           - Otherwise show "Edit" and call StartEdit(user)
+                           - Disable while isUpdating is true (same idea as deletionId for Delete)
+                           Blazor tip: @onclick takes a lambda — "() => StartEdit(user)" *@
+                    </td>
+                    <td>
                         <button class="btn btn-danger btn-sm"
                                 @onclick="() => HandleDelete(user.Id)"
                                 @disabled="@(deletionId is not null)"
@@ -71,6 +81,44 @@ else {
                         </button>
                     </td>
                 </tr>
+
+                @* Edit panel — expands below the row when this user is being edited.
+                   colspan="6" spans all columns so the panel fills the table width. *@
+                @if (editingUserId == user.Id) {
+                    <tr>
+                        <td colspan="6">
+                            <div class="p-3 border rounded bg-light">
+                                <h6>Edit User #@user.Id</h6>
+
+                                @* TODO: Username input field.
+                                   Bind to editUsername with @bind="editUsername".
+                                   Blazor tip: @bind is two-way — it sets the field on change
+                                   AND renders the current value. Equivalent to React's
+                                   value={x} onChange={e => setX(e.target.value)} *@
+
+                                @* TODO: Email input field — same pattern as username,
+                                   bound to editEmail. *@
+
+                                @* TODO: "Change Password…" button.
+                                   Calls OpenPasswordModal() on click.
+                                   Style: btn btn-outline-secondary btn-sm *@
+
+                                @* TODO: Save button — calls HandleUpdate() on click.
+                                   Show "⏳ Saving..." text while isUpdating is true.
+                                   Disable while isUpdating is true.
+                                   Style: btn btn-primary btn-sm *@
+
+                                @* TODO: Cancel button — calls CancelEdit() on click.
+                                   Style: btn btn-secondary btn-sm ms-2 *@
+
+                                @* Error message area — only shown when updateErrorMessage is set *@
+                                @if (updateErrorMessage is not null) {
+                                    <div class="alert alert-danger mt-2">@updateErrorMessage</div>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
             }
         </tbody>
     </table>
@@ -79,6 +127,42 @@ else {
         <div class="alert alert-danger">@deletionErrorMessage</div>
     }
 }
+
+@* =============================================================================
+   PASSWORD MODAL
+   A Bootstrap modal rendered as a Razor conditional block.
+   @ref captures the DOM element so JS interop can call bootstrap.Modal.show/hide.
+   ============================================================================= *@
+<div class="modal fade" tabindex="-1" @ref="passwordModalRef">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Change Password</h5>
+                <button type="button" class="btn-close" @onclick="ClosePasswordModal"></button>
+            </div>
+            <div class="modal-body">
+                @* TODO: Password input field — bind to editPassword.
+                   Use type="password" so the browser masks the input.
+                   Blazor tip: <input type="password" class="form-control" @bind="editPassword" /> *@
+
+                @* TODO: Confirm password field — bind to editPasswordConfirm.
+                   We'll validate client-side that both fields match before sending. *@
+
+                @* Error message area for password-specific errors *@
+                @if (passwordErrorMessage is not null) {
+                    <div class="alert alert-danger mt-2">@passwordErrorMessage</div>
+                }
+            </div>
+            <div class="modal-footer">
+                @* TODO: Save Password button — calls HandlePasswordUpdate() on click.
+                   Show "⏳ Saving..." while isUpdatingPassword is true.
+                   Disable while isUpdatingPassword is true. *@
+
+                @* TODO: Cancel button — calls ClosePasswordModal() on click. *@
+            </div>
+        </div>
+    </div>
+</div>
 
 @code {
     // =============================================================================
@@ -102,6 +186,35 @@ else {
     // deletionErrorMessage: holds any delete error to display in the UI
     private int? deletionId;
     private string? deletionErrorMessage;
+
+    // =============================================================================
+    // EDIT PANEL STATE
+    //
+    // editingUserId: which row's edit panel is open (null = none)
+    // editUsername / editEmail: two-way bound to the edit panel's input fields
+    // isUpdating: true while the UpdateUser mutation is in-flight
+    // updateErrorMessage: validation or server errors from the update
+    // =============================================================================
+    private int? editingUserId;
+    private string? editUsername;
+    private string? editEmail;
+    private bool isUpdating;
+    private string? updateErrorMessage;
+
+    // =============================================================================
+    // PASSWORD MODAL STATE
+    //
+    // passwordModalRef: ElementReference captured by @ref on the modal <div>.
+    //   Used by JS interop to call bootstrap.Modal.getOrCreateInstance(el).show/hide.
+    // editPassword / editPasswordConfirm: bound to the two password fields
+    // isUpdatingPassword: true while the password-only UpdateUser call is in-flight
+    // passwordErrorMessage: validation or server errors for the password change
+    // =============================================================================
+    private ElementReference passwordModalRef;
+    private string? editPassword;
+    private string? editPasswordConfirm;
+    private bool isUpdatingPassword;
+    private string? passwordErrorMessage;
 
     // =============================================================================
     // LIFECYCLE: OnInitializedAsync
@@ -210,6 +323,117 @@ else {
         finally {
             deletionId = null;
         }
+    }
+    // =========================================================================
+    // StartEdit — opens the edit panel for a row, pre-filling the fields
+    // with the current values from the table so the user sees what's there.
+    //
+    // TODO: Set editingUserId to user.Id.
+    //       Set editUsername and editEmail from the user object passed in.
+    //       Clear updateErrorMessage (stale error from a previous edit attempt).
+    //
+    // Blazor tip: no StateHasChanged() needed — assigning to a field and
+    // returning from an event handler triggers a re-render automatically.
+    // =========================================================================
+    private void StartEdit(IGetUsers_Users user)
+    {
+        throw new NotImplementedException();
+    }
+
+    // =========================================================================
+    // CancelEdit — closes the edit panel without saving.
+    //
+    // TODO: Set editingUserId to null.
+    //       Clear editUsername, editEmail, updateErrorMessage.
+    // =========================================================================
+    private void CancelEdit()
+    {
+        throw new NotImplementedException();
+    }
+
+    // =========================================================================
+    // HandleUpdate — saves username and/or email changes.
+    //
+    // Calls Client.UpdateUser.ExecuteAsync(id, username, email, password: null).
+    // StrawberryShake signature:
+    //   ExecuteAsync(int id, string? username, string? email, string? password)
+    //   → IOperationResult<IUpdateUserResult>
+    //
+    // Payload path: result.Data!.UpdateUser  (type: IUpdateUser_UpdateUser)
+    //   .User    → IUpdateUser_UpdateUser_User?  (id, username, email)
+    //   .Errors  → IReadOnlyList<IUpdateUser_UpdateUser_Errors>?
+    //              each error: .Code (UpdateUserErrorCode enum), .Message (string)
+    //
+    // On success:
+    //   - Find the user in the local `users` list by Id and refresh from the
+    //     returned payload so the table reflects the new values without a
+    //     full re-fetch. Note: IGetUsers_Users is a generated interface — you
+    //     can't update it in-place. Replace the list entry instead, or just
+    //     reload the full list with a second GetUsers call (simpler for now).
+    //   - Call CancelEdit() to close the panel.
+    //
+    // Error handling follows the same three-branch pattern as HandleDelete:
+    //   1. top-level result.Errors  — transport/auth errors
+    //   2. payload.Errors           — business rule errors (UsernameTaken, etc.)
+    //   3. else                     — unexpected shape fallback
+    //
+    // TODO: Implement this method.
+    // =========================================================================
+    private async Task HandleUpdate()
+    {
+        throw new NotImplementedException();
+    }
+
+    // =========================================================================
+    // OpenPasswordModal — shows the Bootstrap modal via JS interop.
+    //
+    // JS interop syntax:
+    //   await JS.InvokeVoidAsync("eval",
+    //       "bootstrap.Modal.getOrCreateInstance(document.getElementById('...)).show()");
+    //
+    // Better: pass the ElementReference directly —
+    //   await JS.InvokeVoidAsync("bootstrapModalShow", passwordModalRef);
+    // and add a tiny JS helper in index.html:
+    //   window.bootstrapModalShow = el => bootstrap.Modal.getOrCreateInstance(el).show();
+    //   window.bootstrapModalHide = el => bootstrap.Modal.getOrCreateInstance(el).hide();
+    //
+    // TODO: Clear editPassword, editPasswordConfirm, passwordErrorMessage.
+    //       Call the JS interop to show the modal.
+    // =========================================================================
+    private async Task OpenPasswordModal()
+    {
+        throw new NotImplementedException();
+    }
+
+    // =========================================================================
+    // ClosePasswordModal — hides the Bootstrap modal via JS interop.
+    //
+    // TODO: Call the JS interop to hide the modal.
+    //       Clear password fields and passwordErrorMessage.
+    // =========================================================================
+    private async Task ClosePasswordModal()
+    {
+        throw new NotImplementedException();
+    }
+
+    // =========================================================================
+    // HandlePasswordUpdate — saves a password change only.
+    //
+    // Client-side validation first:
+    //   - editPassword must not be null/whitespace
+    //   - editPassword must equal editPasswordConfirm (show passwordErrorMessage if not)
+    //
+    // Then calls Client.UpdateUser.ExecuteAsync(
+    //     editingUserId!.Value, username: null, email: null, password: editPassword)
+    //
+    // On success: call ClosePasswordModal(). No table update needed (password
+    // isn't displayed). On error: set passwordErrorMessage (stay in the modal).
+    //
+    // TODO: Implement this method.
+    // =========================================================================
+    private async Task HandlePasswordUpdate()
+    {
+        throw new NotImplementedException();
     }
 }
 @* End @code *@
