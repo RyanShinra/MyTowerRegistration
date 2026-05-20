@@ -1,7 +1,7 @@
 @* =============================================================================
    USERS.RAZOR — User List Page
 
-   This page displays all registered users fetched via StrawberryShake.
+   This page displays all registered _users fetched via StrawberryShake.
 
    What changed from the raw HttpClient version:
      - @inject HttpClient Http  →  @inject IMyTowerClient Client
@@ -35,14 +35,14 @@
 
 <h1>Users</h1>
 
-@if (isLoading) {
+@if (_isLoading) {
     @* Show a spinner while the GraphQL query is in flight.
        In Blazor WASM, this renders client-side as soon as the component mounts
        and OnInitializedAsync begins its await. *@
     <p><em>Loading...</em></p>
 }
-else if (errorMessage is not null) {
-    <div class="alert alert-danger">@errorMessage</div>
+else if (_errorMessage is not null) {
+    <div class="alert alert-danger">@_errorMessage</div>
 }
 else {
     <table class="table">
@@ -59,7 +59,7 @@ else {
         <tbody>
             @* @foreach in a template is C# — the @ prefix signals to Razor
                that what follows is C# code, not HTML markup. *@
-            @foreach (var user in users) {
+            @foreach (var user in _users) {
                 <tr>
                     <td>@user.Id</td>
                     <td>@user.Username</td>
@@ -69,22 +69,22 @@ else {
                         @* TODO: Render an Edit / Close toggle button.
                            - If editingUserId == user.Id, show "Close" and call CancelEdit()
                            - Otherwise show "Edit" and call StartEdit(user)
-                           - Disable while isUpdating is true (same idea as deletionId for Delete)
+                           - Disable while _isUpdating is true (same idea as _deletionId for Delete)
                            Blazor tip: @onclick takes a lambda — "() => StartEdit(user)" *@
                     </td>
                     <td>
                         <button class="btn btn-danger btn-sm"
                                 @onclick="() => HandleDelete(user.Id)"
-                                @disabled="@(deletionId is not null)"
+                                @disabled="@(_deletionId is not null)"
                         >
-                            @(deletionId == user.Id ? "⏳ Deleting..." : "Delete")
+                            @(_deletionId == user.Id ? "⏳ Deleting..." : "Delete")
                         </button>
                     </td>
                 </tr>
 
                 @* Edit panel — expands below the row when this user is being edited.
                    colspan="6" spans all columns so the panel fills the table width. *@
-                @if (editingUserId == user.Id) {
+                @if (_activeEdit?.UserId == user.Id) {
                     <tr>
                         <td colspan="6">
                             <div class="p-3 border rounded bg-light">
@@ -104,16 +104,16 @@ else {
                                    Style: btn btn-outline-secondary btn-sm *@
 
                                 @* TODO: Save button — calls HandleUpdate() on click.
-                                   Show "⏳ Saving..." text while isUpdating is true.
-                                   Disable while isUpdating is true.
+                                   Show "⏳ Saving..." text while _isUpdating is true.
+                                   Disable while _isUpdating is true.
                                    Style: btn btn-primary btn-sm *@
 
                                 @* TODO: Cancel button — calls CancelEdit() on click.
                                    Style: btn btn-secondary btn-sm ms-2 *@
 
-                                @* Error message area — only shown when updateErrorMessage is set *@
-                                @if (updateErrorMessage is not null) {
-                                    <div class="alert alert-danger mt-2">@updateErrorMessage</div>
+                                @* Error message area — only shown when _updateErrorMessage is set *@
+                                @if (_updateErrorMessage is not null) {
+                                    <div class="alert alert-danger mt-2">@_updateErrorMessage</div>
                                 }
                             </div>
                         </td>
@@ -123,8 +123,8 @@ else {
         </tbody>
     </table>
 
-    @if (deletionErrorMessage is not null) {
-        <div class="alert alert-danger">@deletionErrorMessage</div>
+    @if (_deletionErrorMessage is not null) {
+        <div class="alert alert-danger">@_deletionErrorMessage</div>
     }
 }
 
@@ -133,7 +133,7 @@ else {
    A Bootstrap modal rendered as a Razor conditional block.
    @ref captures the DOM element so JS interop can call bootstrap.Modal.show/hide.
    ============================================================================= *@
-<div class="modal fade" tabindex="-1" @ref="passwordModalRef">
+<div class="modal fade" tabindex="-1" @ref="_passwordModalRef">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
@@ -141,22 +141,22 @@ else {
                 <button type="button" class="btn-close" @onclick="ClosePasswordModal"></button>
             </div>
             <div class="modal-body">
-                @* TODO: Password input field — bind to editPassword.
+                @* TODO: Password input field — bind to _editPassword.
                    Use type="password" so the browser masks the input.
-                   Blazor tip: <input type="password" class="form-control" @bind="editPassword" /> *@
+                   Blazor tip: <input type="password" class="form-control" @bind="_editPassword" /> *@
 
-                @* TODO: Confirm password field — bind to editPasswordConfirm.
+                @* TODO: Confirm password field — bind to _editPasswordConfirm.
                    We'll validate client-side that both fields match before sending. *@
 
                 @* Error message area for password-specific errors *@
-                @if (passwordErrorMessage is not null) {
-                    <div class="alert alert-danger mt-2">@passwordErrorMessage</div>
+                @if (_passwordErrorMessage is not null) {
+                    <div class="alert alert-danger mt-2">@_passwordErrorMessage</div>
                 }
             </div>
             <div class="modal-footer">
                 @* TODO: Save Password button — calls HandlePasswordUpdate() on click.
-                   Show "⏳ Saving..." while isUpdatingPassword is true.
-                   Disable while isUpdatingPassword is true. *@
+                   Show "⏳ Saving..." while _isUpdatingPassword is true.
+                   Disable while _isUpdatingPassword is true. *@
 
                 @* TODO: Cancel button — calls ClosePasswordModal() on click. *@
             </div>
@@ -172,49 +172,57 @@ else {
     // When any of these fields change and the component re-renders, Blazor
     // efficiently diffs the virtual DOM and applies only the minimal DOM changes.
     //
-    // users is List<IGetUsers_Users> — a generated StrawberryShake interface type
+    // _users is List<IGetUsers_Users> — a generated StrawberryShake interface type
     // whose properties (Id, Username, Email, CreatedAt) come directly from the
     // fields selected in GraphQL/GetUsers.graphql. If we ever change the selection
     // set in that .graphql file, this type updates at the next build.
     // =============================================================================
 
-    private bool isLoading = true;
-    private string? errorMessage;
-    private List<IGetUsers_Users> users = new();
+    private bool _isLoading = true;
+    private string? _errorMessage;
+    private List<IGetUsers_Users> _users = new();
 
-    // deletionId: tracks which row's delete button is in-flight (disables it during the request)
-    // deletionErrorMessage: holds any delete error to display in the UI
-    private int? deletionId;
-    private string? deletionErrorMessage;
+    // _deletionId: tracks which row's delete button is in-flight (disables it during the request)
+    // _deletionErrorMessage: holds any delete error to display in the UI
+    private int? _deletionId;
+    private string? _deletionErrorMessage;
 
     // =============================================================================
     // EDIT PANEL STATE
     //
-    // editingUserId: which row's edit panel is open (null = none)
-    // editUsername / editEmail: two-way bound to the edit panel's input fields
-    // isUpdating: true while the UpdateUser mutation is in-flight
-    // updateErrorMessage: validation or server errors from the update
+    // EditOriginals: Immutable snapshot of the user's values at the moment Edit was clicked
+    // _activeEdit: null when no row is open, otherwise points to the original values of the row
+    // _draft*Field*: mutable 
     // =============================================================================
-    private int? editingUserId;
-    private string? editUsername;
-    private string? editEmail;
-    private bool isUpdating;
-    private string? updateErrorMessage;
+
+    private record EditOriginals(int UserId, string Username, string Email);
+
+    /// <summary>_activeEdit: null when no row is open, otherwise points to the original values of the row.</summary>
+    private EditOriginals? _activeEdit;   // null = no row is open
+    private string? _draftUsername;       // @bind target — mutable copy
+    private string? _draftEmail;          // @bind target — mutable copy
+
+    /// <summary>
+    /// True only during the UpdateUser HTTP round-trip. Distinct from
+    /// <c>_activeEdit</c>, which stays set the entire time the panel is open.
+    /// </summary>
+    private bool _isUpdating;
+    private string? _updateErrorMessage;
 
     // =============================================================================
     // PASSWORD MODAL STATE
     //
-    // passwordModalRef: ElementReference captured by @ref on the modal <div>.
+    // _passwordModalRef: ElementReference captured by @ref on the modal <div>.
     //   Used by JS interop to call bootstrap.Modal.getOrCreateInstance(el).show/hide.
-    // editPassword / editPasswordConfirm: bound to the two password fields
-    // isUpdatingPassword: true while the password-only UpdateUser call is in-flight
-    // passwordErrorMessage: validation or server errors for the password change
+    // _editPassword / _editPasswordConfirm: bound to the two password fields
+    // _isUpdatingPassword: true while the password-only UpdateUser call is in-flight
+    // _passwordErrorMessage: validation or server errors for the password change
     // =============================================================================
-    private ElementReference passwordModalRef;
-    private string? editPassword;
-    private string? editPasswordConfirm;
-    private bool isUpdatingPassword;
-    private string? passwordErrorMessage;
+    private ElementReference _passwordModalRef;
+    private string? _editPassword;
+    private string? _editPasswordConfirm;
+    private bool _isUpdatingPassword;
+    private string? _passwordErrorMessage;
 
     // =============================================================================
     // LIFECYCLE: OnInitializedAsync
@@ -251,30 +259,30 @@ else {
             IOperationResult<IGetUsersResult> result = await Client.GetUsers.ExecuteAsync();
 
             if (result.Errors is { Count: > 0 } topLevelErrors) {
-                errorMessage = $"GraphQL error(s): {string.Join("; ", topLevelErrors.Select(e => e.Message))}";
+                _errorMessage = $"GraphQL error(s): {string.Join("; ", topLevelErrors.Select(e => e.Message))}";
                 return;
             }
 
             // result.Data is non-null here because Errors was empty.
             // Users is IReadOnlyList<IGetUsers_Users> — we ToList() so we can RemoveAll()
             // later when the user deletes a row without re-fetching the full list.
-            users = result.Data!.Users.ToList();
+            _users = result.Data!.Users.ToList();
         }
         catch (Exception ex) {
-            errorMessage = $"Failed to load users: {ex.Message}";
+            _errorMessage = $"Failed to load users: {ex.Message}";
         }
         finally {
             // Always clear the loading state, even if an exception occurred.
             // Without this, the spinner would spin forever on error.
-            isLoading = false;
+            _isLoading = false;
         }
     }
 
     private async Task HandleDelete(int userIdToDelete)
     {
-        if (deletionId is not null) return; // can only delete one at a time
-        deletionErrorMessage = null;
-        deletionId = userIdToDelete;
+        if (_deletionId is not null) return; // can only delete one at a time
+        _deletionErrorMessage = null;
+        _deletionId = userIdToDelete;
 
         try {
             // Client.DeleteUser is the generated IDeleteUserMutation.
@@ -289,7 +297,7 @@ else {
             IOperationResult<IDeleteUserResult> result = await Client.DeleteUser.ExecuteAsync(userIdToDelete);
 
             if (result.Errors is { Count: > 0 } topLevelErrors) {
-                deletionErrorMessage = $"GraphQL error(s): {string.Join("; ", topLevelErrors.Select(e => e.Message))}";
+                _deletionErrorMessage = $"GraphQL error(s): {string.Join("; ", topLevelErrors.Select(e => e.Message))}";
                 return;
             }
 
@@ -300,11 +308,11 @@ else {
                 // The API returns validation errors as data (error-as-data pattern),
                 // not as HTTP errors. We surface them here.
                 // e.Code is DeleteUserErrorCode enum — compare to old code where it was string.
-                deletionErrorMessage = string.Join(" | ", validationErrors.Select(e => $"{e.Code}: {e.Message}"));
+                _deletionErrorMessage = string.Join(" | ", validationErrors.Select(e => $"{e.Code}: {e.Message}"));
             }
             else if (payload.User is not null) {
                 // Remove the deleted row from the local list without re-fetching.
-                users.RemoveAll(u => u.Id == userIdToDelete);
+                _users.RemoveAll(u => u.Id == userIdToDelete);
             }
             else {
                 // Fallback: server returned HTTP 200, no top-level errors, no payload errors,
@@ -314,41 +322,50 @@ else {
                 // This case exists because GraphQL's type system allows nullable payload fields.
                 // StrawberryShake narrows the type to the generated interface but can't guarantee
                 // non-null at compile time for nullable schema fields.
-                deletionErrorMessage = "Delete did not return a result. The user may not have been deleted.";
+                _deletionErrorMessage = "Delete did not return a result. The user may not have been deleted.";
             }
         }
         catch (Exception ex) {
-            deletionErrorMessage = $"Unexpected error: {ex.Message}";
+            _deletionErrorMessage = $"Unexpected error: {ex.Message}";
         }
         finally {
-            deletionId = null;
+            _deletionId = null;
         }
     }
+
+    private void SetActiveEdit(EditOriginals? model, [System.Runtime.CompilerServices.CallerMemberName] string caller = "")
+    {
+        _activeEdit = model;
+        _draftUsername = model?.Username;
+        _draftEmail = model?.Email;
+        _updateErrorMessage = null;
+    }
+
+
+
     // =========================================================================
     // StartEdit — opens the edit panel for a row, pre-filling the fields
     // with the current values from the table so the user sees what's there.
     //
     // TODO: Set editingUserId to user.Id.
     //       Set editUsername and editEmail from the user object passed in.
-    //       Clear updateErrorMessage (stale error from a previous edit attempt).
+    //       Clear _updateErrorMessage (stale error from a previous edit attempt).
     //
     // Blazor tip: no StateHasChanged() needed — assigning to a field and
     // returning from an event handler triggers a re-render automatically.
     // =========================================================================
     private void StartEdit(IGetUsers_Users user)
     {
-        throw new NotImplementedException();
+        EditOriginals currentRow = new EditOriginals(user.Id, user.Username, user.Email);
+        SetActiveEdit(currentRow);
     }
 
     // =========================================================================
     // CancelEdit — closes the edit panel without saving.
-    //
-    // TODO: Set editingUserId to null.
-    //       Clear editUsername, editEmail, updateErrorMessage.
     // =========================================================================
     private void CancelEdit()
     {
-        throw new NotImplementedException();
+        SetActiveEdit(null);
     }
 
     // =========================================================================
@@ -365,7 +382,7 @@ else {
     //              each error: .Code (UpdateUserErrorCode enum), .Message (string)
     //
     // On success:
-    //   - Find the user in the local `users` list by Id and refresh from the
+    //   - Find the user in the local `_users` list by Id and refresh from the
     //     returned payload so the table reflects the new values without a
     //     full re-fetch. Note: IGetUsers_Users is a generated interface — you
     //     can't update it in-place. Replace the list entry instead, or just
@@ -392,12 +409,12 @@ else {
     //       "bootstrap.Modal.getOrCreateInstance(document.getElementById('...)).show()");
     //
     // Better: pass the ElementReference directly —
-    //   await JS.InvokeVoidAsync("bootstrapModalShow", passwordModalRef);
+    //   await JS.InvokeVoidAsync("bootstrapModalShow", _passwordModalRef);
     // and add a tiny JS helper in index.html:
     //   window.bootstrapModalShow = el => bootstrap.Modal.getOrCreateInstance(el).show();
     //   window.bootstrapModalHide = el => bootstrap.Modal.getOrCreateInstance(el).hide();
     //
-    // TODO: Clear editPassword, editPasswordConfirm, passwordErrorMessage.
+    // TODO: Clear _editPassword, _editPasswordConfirm, _passwordErrorMessage.
     //       Call the JS interop to show the modal.
     // =========================================================================
     private async Task OpenPasswordModal()
@@ -409,7 +426,7 @@ else {
     // ClosePasswordModal — hides the Bootstrap modal via JS interop.
     //
     // TODO: Call the JS interop to hide the modal.
-    //       Clear password fields and passwordErrorMessage.
+    //       Clear password fields and _passwordErrorMessage.
     // =========================================================================
     private async Task ClosePasswordModal()
     {
@@ -420,14 +437,14 @@ else {
     // HandlePasswordUpdate — saves a password change only.
     //
     // Client-side validation first:
-    //   - editPassword must not be null/whitespace
-    //   - editPassword must equal editPasswordConfirm (show passwordErrorMessage if not)
+    //   - _editPassword must not be null/whitespace
+    //   - _editPassword must equal _editPasswordConfirm (show _passwordErrorMessage if not)
     //
     // Then calls Client.UpdateUser.ExecuteAsync(
-    //     editingUserId!.Value, username: null, email: null, password: editPassword)
+    //     editingUserId!.Value, username: null, email: null, password: _editPassword)
     //
     // On success: call ClosePasswordModal(). No table update needed (password
-    // isn't displayed). On error: set passwordErrorMessage (stay in the modal).
+    // isn't displayed). On error: set _passwordErrorMessage (stay in the modal).
     //
     // TODO: Implement this method.
     // =========================================================================
