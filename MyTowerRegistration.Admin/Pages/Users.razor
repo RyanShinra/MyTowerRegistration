@@ -71,6 +71,22 @@ else {
                            - Otherwise show "Edit" and call StartEdit(user)
                            - Disable while _isUpdating is true (same idea as _deletionId for Delete)
                            Blazor tip: @onclick takes a lambda — "() => StartEdit(user)" *@
+                        @if (_activeEdit?.UserId == user.Id)
+                        {
+                            <button class="btn btn-outline-secondary btn-sm" 
+                                    @onclick="CancelEdit"
+                                    disabled="@_isUpdating">
+                                    ⤴️ Close
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-outline-secondary btn-sm"
+                                    @onclick="() => StartEdit(user)"
+                                    disabled="@_isUpdating">
+                                📝 Edit
+                            </button>
+                        }
                     </td>
                     <td>
                         <button class="btn btn-danger btn-sm"
