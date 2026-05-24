@@ -85,7 +85,7 @@ else {
                                     @onclick="() => StartEdit(user)"
                                     disabled="@_isUpdating">
                                 📝 Edit
-                            </button>
+                                </button>
                         }
                     </td>
                     <td>
@@ -102,40 +102,11 @@ else {
                    colspan="6" spans all columns so the panel fills the table width. *@
                 @if (_activeEdit?.UserId == user.Id) {
                     <tr>
-                        <td colspan="6">
-                            <div class="p-3 border rounded bg-light">
-                                <h6>Edit User #@user.Id</h6>
-
-                                @* TODO: Username input field.
-                                   Bind to editUsername with @bind="editUsername".
-                                   Blazor tip: @bind is two-way — it sets the field on change
-                                   AND renders the current value. Equivalent to React's
-                                   value={x} onChange={e => setX(e.target.value)} *@
-
-                                @* TODO: Email input field — same pattern as username,
-                                   bound to editEmail. *@
-
-                                @* TODO: "Change Password…" button.
-                                   Calls OpenPasswordModal() on click.
-                                   Style: btn btn-outline-secondary btn-sm *@
-
-                                @* TODO: Save button — calls HandleUpdate() on click.
-                                   Show "⏳ Saving..." text while _isUpdating is true.
-                                   Disable while _isUpdating is true.
-                                   Style: btn btn-primary btn-sm *@
-
-                                @* TODO: Cancel button — calls CancelEdit() on click.
-                                   Style: btn btn-secondary btn-sm ms-2 *@
-
-                                @* Error message area — only shown when _updateErrorMessage is set *@
-                                @if (_updateErrorMessage is not null) {
-                                    <div class="alert alert-danger mt-2">@_updateErrorMessage</div>
-                                }
-                            </div>
-                        </td>
+                        <td>@user.Id</td>
+                        <td><input type="text" class="form-control form-control-sm" @bind="_draftUsername"/></td>
                     </tr>
-                }
-            }
+                } // End if this user is being actively edited
+            } @*End For Each user to be displayed*@
         </tbody>
     </table>
 
