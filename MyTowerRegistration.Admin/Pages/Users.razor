@@ -103,7 +103,27 @@ else {
                 @if (_activeEdit?.UserId == user.Id) {
                     <tr>
                         <td>@user.Id</td>
-                        <td><input type="text" class="form-control form-control-sm" @bind="_draftUsername"/></td>
+                        <td><input type="text" class="form-control form-control-sm" 
+                            @bind="_draftUsername"/></td>
+                        <td><input type="text" class="form-control form-control-sm" 
+                            @bind="_draftEmail" /></td>
+                        <td>
+                            <button class="btn btn-outline-secondary btn-sm" 
+                            @onclick="OpenPasswordModal">🔐 Password... </button>
+                        </td>
+                        <td>
+                            <button class="btn btn-success btn-sm" 
+                                    @onclick="HandleUpdate"
+                                    disabled="@_isUpdating">
+                                @(_isUpdating ? "⌛" : "Save")
+                            </button>
+                            <button class="btn btn-secondary btn-sm ms-1"
+                                         @onclick="CancelEdit"
+                                         @disabled="@_isUpdating">
+                                Cancel
+                        </button>
+                        </td>
+
                     </tr>
                 } // End if this user is being actively edited
             } @*End For Each user to be displayed*@
