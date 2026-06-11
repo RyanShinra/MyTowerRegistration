@@ -71,28 +71,25 @@ else {
                            - Otherwise show "Edit" and call StartEdit(user)
                            - Disable while _isUpdating is true (same idea as _deletionId for Delete)
                            Blazor tip: @onclick takes a lambda — "() => StartEdit(user)" *@
-                        @if (_activeEdit?.UserId == user.Id)
-                        {
-                            <button class="btn btn-outline-secondary btn-sm" 
+                        @if (_activeEdit?.UserId == user.Id) {
+                            <button class="btn btn-outline-secondary btn-sm"
                                     @onclick="CancelEdit"
-                                    disabled="@_isUpdating">
-                                    ⤴️ Close
+                                    @disabled="@_isUpdating">
+                                ⤴️ Close
                             </button>
                         }
-                        else
-                        {
+                        else {
                             <button class="btn btn-outline-secondary btn-sm"
                                     @onclick="() => StartEdit(user)"
-                                    disabled="@_isUpdating">
+                                    @disabled="@_isUpdating">
                                 📝 Edit
-                                </button>
+                            </button>
                         }
                     </td>
                     <td>
                         <button class="btn btn-danger btn-sm"
                                 @onclick="() => HandleDelete(user.Id)"
-                                @disabled="@(_deletionId is not null)"
-                        >
+                                @disabled="@(_deletionId is not null)">
                             @(_deletionId == user.Id ? "⏳ Deleting..." : "Delete")
                         </button>
                     </td>
@@ -103,29 +100,47 @@ else {
                 @if (_activeEdit?.UserId == user.Id) {
                     <tr>
                         <td>@user.Id</td>
-                        <td><input type="text" class="form-control form-control-sm" 
-                            @bind="_draftUsername"/></td>
-                        <td><input type="text" class="form-control form-control-sm" 
-                            @bind="_draftEmail" /></td>
                         <td>
-                            <button class="btn btn-outline-secondary btn-sm" 
-                            @onclick="OpenPasswordModal">🔐 Password... </button>
+                            <input type="text" class="form-control form-control-sm"
+                                   @bind="_draftUsername" />
                         </td>
                         <td>
-                            <button class="btn btn-success btn-sm" 
+                            <input type="text" class="form-control form-control-sm"
+                                   @bind="_draftEmail" />
+                        </td>
+                        <td>
+                            <button class="btn btn-outline-secondary btn-sm"
+                                    @onclick="OpenPasswordModal">
+                                🔐 Password...
+                            </button>
+                        </td>
+                        <td>
+                            <button class="btn btn-success btn-sm"
                                     @onclick="HandleUpdate"
-                                    disabled="@_isUpdating">
+                                    @disabled="@_isUpdating">
                                 @(_isUpdating ? "⌛" : "Save")
                             </button>
                             <button class="btn btn-secondary btn-sm ms-1"
-                                         @onclick="CancelEdit"
-                                         @disabled="@_isUpdating">
+                                    @onclick="CancelEdit"
+                                    @disabled="@_isUpdating">
                                 Cancel
-                        </button>
+                            </button>
+                        </td>
+                        <td>
+                            😇
                         </td>
 
                     </tr>
-                } // End if this user is being actively edited
+                    @if (_updateErrorMessage is not null)
+                    {
+                        <tr>
+                            <td colspan="6">
+                                <div class="alert alert-danger mb-0">@_updateErrorMessage</div>
+                            </td>
+                        </tr>
+                    }
+                } 
+                @*// End if this user is being actively edited*@
             } @*End For Each user to be displayed*@
         </tbody>
     </table>
@@ -151,10 +166,12 @@ else {
                 @* TODO: Password input field — bind to _editPassword.
                    Use type="password" so the browser masks the input.
                    Blazor tip: <input type="password" class="form-control" @bind="_editPassword" /> *@
-
+                   
+                   New Password <input type="password" class="form-control" @bind="_editPassword" />
                 @* TODO: Confirm password field — bind to _editPasswordConfirm.
                    We'll validate client-side that both fields match before sending. *@
 
+                    Repeat Password <input type="password" class="form-control" @bind="_editPasswordConfirm" />
                 @* Error message area for password-specific errors *@
                 @if (_passwordErrorMessage is not null) {
                     <div class="alert alert-danger mt-2">@_passwordErrorMessage</div>
@@ -199,7 +216,7 @@ else {
     //
     // EditOriginals: Immutable snapshot of the user's values at the moment Edit was clicked
     // _activeEdit: null when no row is open, otherwise points to the original values of the row
-    // _draft*Field*: mutable 
+    // _draft*Field*: mutable
     // =============================================================================
 
     private record EditOriginals(int UserId, string Username, string Email);
@@ -250,6 +267,13 @@ else {
     // =============================================================================
     protected override async Task OnInitializedAsync()
     {
+
+        await RefreshUsers();
+    }
+
+    private async Task RefreshUsers()
+    {
+        _isLoading = true; 
         try {
             // StrawberryShake call: Client.GetUsers is the generated IGetUsersQuery.
             // ExecuteAsync() sends the GetUsers.graphql operation over HTTP, deserializes
@@ -354,10 +378,6 @@ else {
     // StartEdit — opens the edit panel for a row, pre-filling the fields
     // with the current values from the table so the user sees what's there.
     //
-    // TODO: Set editingUserId to user.Id.
-    //       Set editUsername and editEmail from the user object passed in.
-    //       Clear _updateErrorMessage (stale error from a previous edit attempt).
-    //
     // Blazor tip: no StateHasChanged() needed — assigning to a field and
     // returning from an event handler triggers a re-render automatically.
     // =========================================================================
@@ -405,7 +425,48 @@ else {
     // =========================================================================
     private async Task HandleUpdate()
     {
-        throw new NotImplementedException();
+        if (_activeEdit is null) return;
+
+        _updateErrorMessage = null;
+        _isUpdating = true;
+
+        try {
+            IOperationResult<IUpdateUserResult> result =
+                await Client.UpdateUser.ExecuteAsync(
+                    _activeEdit.UserId, _draftUsername, _draftEmail, password: null);
+
+            // var topLevelErrors = result.Errors
+            // if (topLevelErrors is not null && topLevelErrors.Count > 0) {
+            // ... topLevelErrors.Select(e => e.Messge)
+            // }
+            // Idiomatic form — null check, count check, and variable binding in one:
+            if (result.Errors is { Count: > 0} topLevelErrors)
+            {
+                IEnumerable<string> errorList = topLevelErrors.Select(error => error.Message);
+                _updateErrorMessage = $"GraphQL Errors(s): {string.Join("; ", errorList)}";
+                return;
+            }
+
+            // This presumes that Strawberry Shake's payload delivers Data in non-error conditions
+            IUpdateUser_UpdateUser payload = result.Data!.UpdateUser;
+
+            if (payload.Errors is {Count: > 0} validationErrors) {
+                _updateErrorMessage = string.Join(" | ", validationErrors.Select(e => $"{e.Code}: {e.Message}"));
+            }
+            else if (payload.User is not null) {
+                await RefreshUsers();
+                CancelEdit();
+            }
+            else {
+                _updateErrorMessage = "Update did not return a result. The user may not have been saved.";
+            }
+        }
+        catch (Exception ex) {
+            _updateErrorMessage = $"Unexpected error: {ex.Message}";
+        }
+        finally {
+            _isUpdating = false;
+        }
     }
 
     // =========================================================================
