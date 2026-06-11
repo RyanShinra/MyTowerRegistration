@@ -166,12 +166,14 @@ else {
                 @* TODO: Password input field — bind to _editPassword.
                    Use type="password" so the browser masks the input.
                    Blazor tip: <input type="password" class="form-control" @bind="_editPassword" /> *@
-                   
-                   New Password <input type="password" class="form-control" @bind="_editPassword" />
+                <label class="form-label">New Password</label>
+                <input type="password" class="form-control" @bind="_editPassword" />
+                
                 @* TODO: Confirm password field — bind to _editPasswordConfirm.
                    We'll validate client-side that both fields match before sending. *@
-
-                    Repeat Password <input type="password" class="form-control" @bind="_editPasswordConfirm" />
+                <label class="form-label">Repeat Password</label>
+                <input type="password" class="form-control" @bind="_editPasswordConfirm" />
+                
                 @* Error message area for password-specific errors *@
                 @if (_passwordErrorMessage is not null) {
                     <div class="alert alert-danger mt-2">@_passwordErrorMessage</div>
