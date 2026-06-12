@@ -486,7 +486,12 @@ else {
         _editPassword = null;
         _editPasswordConfirm = null;
         _passwordErrorMessage = null;
-        await JS.InvokeVoidAsync("bootstrapModalShow", _passwordModalRef);
+        try {
+            await JS.InvokeVoidAsync("bootstrapModalShow", _passwordModalRef);
+        }
+        catch (Exception ex) {
+            _updateErrorMessage = $"Could not open password dialog: {ex.Message}";
+        }
     }
 
     // =========================================================================
@@ -497,7 +502,12 @@ else {
         _editPassword = null;
         _editPasswordConfirm = null;
         _passwordErrorMessage = null;
-        await JS.InvokeVoidAsync("bootstrapModalHide", _passwordModalRef);
+        try {
+            await JS.InvokeVoidAsync("bootstrapModalHide", _passwordModalRef);
+        }
+        catch (Exception ex) {
+            _passwordErrorMessage = $"Could not close dialog: {ex.Message}";
+        }
     }
 
     // =========================================================================

@@ -553,10 +553,11 @@ echo "OK"
 # There is no server — the browser downloads everything once and runs the
 # app locally in WASM. We host on S3 and serve via CloudFront (AWS CDN).
 #
-# SPA routing: if a user bookmarks /admin/users, their browser requests that
-# path from S3. S3 returns 404 — no file at that path exists. We configure
-# a CloudFront custom error response: 404 → /index.html (HTTP 200). Blazor's
-# client-side Router picks up the URL and navigates correctly.
+# SPA routing: if a user navigates directly to /users or any other Blazor
+# route, CloudFront asks S3 for that path — no file exists there. When the
+# bucket is private (OAC), S3 returns 403 Access Denied (not 404) for missing
+# objects. We configure custom error responses for BOTH 403 and 404 → /index.html
+# (HTTP 200). Blazor's client-side Router picks up the URL and navigates correctly.
 #
 # S3 public access is blocked — CloudFront fetches objects using an Origin
 # Access Control (OAC), which signs requests with SigV4. The bucket is never
@@ -645,13 +646,21 @@ if [ -z "${EXISTING_CF_ID}" ] || [ "${EXISTING_CF_ID}" = "None" ]; then
         }
     },
     "CustomErrorResponses": {
-        "Quantity": 1,
-        "Items": [{
-            "ErrorCode": 404,
-            "ResponseCode": "200",
-            "ResponsePagePath": "/index.html",
-            "ErrorCachingMinTTL": 0
-        }]
+        "Quantity": 2,
+        "Items": [
+            {
+                "ErrorCode": 404,
+                "ResponseCode": "200",
+                "ResponsePagePath": "/index.html",
+                "ErrorCachingMinTTL": 0
+            },
+            {
+                "ErrorCode": 403,
+                "ResponseCode": "200",
+                "ResponsePagePath": "/index.html",
+                "ErrorCachingMinTTL": 0
+            }
+        ]
     },
     "Enabled": true,
     "PriceClass": "PriceClass_100",
