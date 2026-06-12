@@ -1,7 +1,7 @@
 @* =============================================================================
    USERS.RAZOR — User List Page
 
-   This page displays all registered _users fetched via StrawberryShake.
+   This page displays all registered users fetched via StrawberryShake.
 
    What changed from the raw HttpClient version:
      - @inject HttpClient Http  →  @inject IMyTowerClient Client
@@ -133,7 +133,7 @@ else {
                         </tr>
                     }
                 }
-                @*// End if this user is being actively edited*@
+                @* End if this user is being actively edited *@
             } @*End For Each user to be displayed*@
         </tbody>
     </table>
@@ -175,7 +175,7 @@ else {
                 </button>
                 <button class="btn btn-secondary btn-sm ms-1"
                         @onclick="ClosePasswordModal"
-                        @disabled ="@_isUpdatingPassword">
+                        @disabled="@_isUpdatingPassword">
                     Cancel
                 </button>
             </div>
@@ -267,6 +267,7 @@ else {
 
     private async Task RefreshUsers()
     {
+        _errorMessage = null;
         _isLoading = true;
         try {
             // StrawberryShake call: Client.GetUsers is the generated IGetUsersQuery.
@@ -358,6 +359,11 @@ else {
         }
     }
 
+    // [CallerMemberName] fills `caller` with the calling method's name at compile time
+    // (e.g. "StartEdit", "CancelEdit") — no runtime reflection. Currently unused, but
+    // retained as a hook for future tracing/logging: Console.WriteLine($"[SetActiveEdit] called by {caller}");
+    // Other uses: conditional behavior per caller, assertion that only expected callers
+    // can open/close the edit panel, and diagnosing double-open bugs.
     private void SetActiveEdit(EditOriginals? model, [System.Runtime.CompilerServices.CallerMemberName] string caller = "")
     {
         _activeEdit = model;
