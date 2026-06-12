@@ -66,11 +66,6 @@ else {
                     <td>@user.Email</td>
                     <td>@user.CreatedAt.ToString("yyyy-MM-dd")</td>
                     <td>
-                        @* TODO: Render an Edit / Close toggle button.
-                           - If editingUserId == user.Id, show "Close" and call CancelEdit()
-                           - Otherwise show "Edit" and call StartEdit(user)
-                           - Disable while _isUpdating is true (same idea as _deletionId for Delete)
-                           Blazor tip: @onclick takes a lambda — "() => StartEdit(user)" *@
                         @if (_activeEdit?.UserId == user.Id) {
                             <button class="btn btn-outline-secondary btn-sm"
                                     @onclick="CancelEdit"
@@ -131,15 +126,14 @@ else {
                         </td>
 
                     </tr>
-                    @if (_updateErrorMessage is not null)
-                    {
+                    @if (_updateErrorMessage is not null) {
                         <tr>
                             <td colspan="6">
                                 <div class="alert alert-danger mb-0">@_updateErrorMessage</div>
                             </td>
                         </tr>
                     }
-                } 
+                }
                 @*// End if this user is being actively edited*@
             } @*End For Each user to be displayed*@
         </tbody>
@@ -163,28 +157,28 @@ else {
                 <button type="button" class="btn-close" @onclick="ClosePasswordModal"></button>
             </div>
             <div class="modal-body">
-                @* TODO: Password input field — bind to _editPassword.
-                   Use type="password" so the browser masks the input.
-                   Blazor tip: <input type="password" class="form-control" @bind="_editPassword" /> *@
                 <label class="form-label">New Password</label>
                 <input type="password" class="form-control" @bind="_editPassword" />
-                
-                @* TODO: Confirm password field — bind to _editPasswordConfirm.
-                   We'll validate client-side that both fields match before sending. *@
+
                 <label class="form-label">Repeat Password</label>
                 <input type="password" class="form-control" @bind="_editPasswordConfirm" />
-                
+
                 @* Error message area for password-specific errors *@
                 @if (_passwordErrorMessage is not null) {
                     <div class="alert alert-danger mt-2">@_passwordErrorMessage</div>
                 }
             </div>
             <div class="modal-footer">
-                @* TODO: Save Password button — calls HandlePasswordUpdate() on click.
-                   Show "⏳ Saving..." while _isUpdatingPassword is true.
-                   Disable while _isUpdatingPassword is true. *@
-
-                @* TODO: Cancel button — calls ClosePasswordModal() on click. *@
+                <button class="btn btn-success btn-sm"
+                        @onclick="HandlePasswordUpdate"
+                        @disabled="@_isUpdatingPassword">
+                    @(_isUpdatingPassword ? "📝 Saving..." : "Save")
+                </button>
+                <button class="btn btn-secondary btn-sm ms-1"
+                        @onclick="ClosePasswordModal"
+                        @disabled ="@_isUpdatingPassword">
+                    Cancel
+                </button>
             </div>
         </div>
     </div>
@@ -269,13 +263,12 @@ else {
     // =============================================================================
     protected override async Task OnInitializedAsync()
     {
-
         await RefreshUsers();
     }
 
     private async Task RefreshUsers()
     {
-        _isLoading = true; 
+        _isLoading = true;
         try {
             // StrawberryShake call: Client.GetUsers is the generated IGetUsersQuery.
             // ExecuteAsync() sends the GetUsers.graphql operation over HTTP, deserializes
@@ -336,16 +329,16 @@ else {
 
             // result.Data is non-null because top-level Errors was empty.
             IDeleteUser_DeleteUser payload = result.Data!.DeleteUser;
+            if (payload.User is not null) {
+                // Remove the deleted row from the local list without re-fetching.
+                _users.RemoveAll(u => u.Id == userIdToDelete);
+            }
 
-            if (payload.Errors is { Count: > 0 } validationErrors) {
+            else if (payload.Errors is { Count: > 0 } validationErrors) {
                 // The API returns validation errors as data (error-as-data pattern),
                 // not as HTTP errors. We surface them here.
                 // e.Code is DeleteUserErrorCode enum — compare to old code where it was string.
                 _deletionErrorMessage = string.Join(" | ", validationErrors.Select(e => $"{e.Code}: {e.Message}"));
-            }
-            else if (payload.User is not null) {
-                // Remove the deleted row from the local list without re-fetching.
-                _users.RemoveAll(u => u.Id == userIdToDelete);
             }
             else {
                 // Fallback: server returned HTTP 200, no top-level errors, no payload errors,
@@ -373,8 +366,6 @@ else {
         _draftEmail = model?.Email;
         _updateErrorMessage = null;
     }
-
-
 
     // =========================================================================
     // StartEdit — opens the edit panel for a row, pre-filling the fields
@@ -422,8 +413,6 @@ else {
     //   1. top-level result.Errors  — transport/auth errors
     //   2. payload.Errors           — business rule errors (UsernameTaken, etc.)
     //   3. else                     — unexpected shape fallback
-    //
-    // TODO: Implement this method.
     // =========================================================================
     private async Task HandleUpdate()
     {
@@ -439,25 +428,24 @@ else {
 
             // var topLevelErrors = result.Errors
             // if (topLevelErrors is not null && topLevelErrors.Count > 0) {
-            // ... topLevelErrors.Select(e => e.Messge)
+            // ... topLevelErrors.Select(e => e.Message)
             // }
             // Idiomatic form — null check, count check, and variable binding in one:
-            if (result.Errors is { Count: > 0} topLevelErrors)
-            {
+            if (result.Errors is { Count: > 0 } topLevelErrors) {
                 IEnumerable<string> errorList = topLevelErrors.Select(error => error.Message);
-                _updateErrorMessage = $"GraphQL Errors(s): {string.Join("; ", errorList)}";
+                _updateErrorMessage = $"GraphQL error(s): {string.Join("; ", errorList)}";
                 return;
             }
 
             // This presumes that Strawberry Shake's payload delivers Data in non-error conditions
             IUpdateUser_UpdateUser payload = result.Data!.UpdateUser;
 
-            if (payload.Errors is {Count: > 0} validationErrors) {
-                _updateErrorMessage = string.Join(" | ", validationErrors.Select(e => $"{e.Code}: {e.Message}"));
-            }
-            else if (payload.User is not null) {
+            if (payload.User is not null) {
                 await RefreshUsers();
                 CancelEdit();
+            }
+            else if (payload.Errors is { Count: > 0 } validationErrors) {
+                _updateErrorMessage = string.Join(" | ", validationErrors.Select(e => $"{e.Code}: {e.Message}"));
             }
             else {
                 _updateErrorMessage = "Update did not return a result. The user may not have been saved.";
@@ -483,24 +471,24 @@ else {
     // and add a tiny JS helper in index.html:
     //   window.bootstrapModalShow = el => bootstrap.Modal.getOrCreateInstance(el).show();
     //   window.bootstrapModalHide = el => bootstrap.Modal.getOrCreateInstance(el).hide();
-    //
-    // TODO: Clear _editPassword, _editPasswordConfirm, _passwordErrorMessage.
-    //       Call the JS interop to show the modal.
     // =========================================================================
     private async Task OpenPasswordModal()
     {
-        throw new NotImplementedException();
+        _editPassword = null;
+        _editPasswordConfirm = null;
+        _passwordErrorMessage = null;
+        await JS.InvokeVoidAsync("bootstrapModalShow", _passwordModalRef);
     }
 
     // =========================================================================
     // ClosePasswordModal — hides the Bootstrap modal via JS interop.
-    //
-    // TODO: Call the JS interop to hide the modal.
-    //       Clear password fields and _passwordErrorMessage.
     // =========================================================================
     private async Task ClosePasswordModal()
     {
-        throw new NotImplementedException();
+        _editPassword = null;
+        _editPasswordConfirm = null;
+        _passwordErrorMessage = null;
+        await JS.InvokeVoidAsync("bootstrapModalHide", _passwordModalRef);
     }
 
     // =========================================================================
@@ -511,16 +499,59 @@ else {
     //   - _editPassword must equal _editPasswordConfirm (show _passwordErrorMessage if not)
     //
     // Then calls Client.UpdateUser.ExecuteAsync(
-    //     editingUserId!.Value, username: null, email: null, password: _editPassword)
+    //     _activeEdit!.UserId, username: null, email: null, password: _editPassword)
     //
     // On success: call ClosePasswordModal(). No table update needed (password
     // isn't displayed). On error: set _passwordErrorMessage (stay in the modal).
-    //
-    // TODO: Implement this method.
     // =========================================================================
     private async Task HandlePasswordUpdate()
     {
-        throw new NotImplementedException();
+        if (_activeEdit is null) return;
+
+        if (string.IsNullOrWhiteSpace(_editPassword)) {
+            _passwordErrorMessage = "Password cannot be empty";
+            return;
+        }
+
+        if (_editPassword != _editPasswordConfirm) {
+            _passwordErrorMessage = "Passwords do not match";
+            return;
+        }
+
+        _passwordErrorMessage = null;
+        _isUpdatingPassword = true;
+
+        try {
+            IOperationResult<IUpdateUserResult> result = await Client.UpdateUser.ExecuteAsync(
+                _activeEdit.UserId, username: null, email: null, password: _editPassword);
+
+            if (result.Errors is { Count: > 0 } topLevelErrors) {
+                IEnumerable<string> errorMessages = topLevelErrors.Select(error => error.Message);
+                string errorString = string.Join("; ", errorMessages);
+                _passwordErrorMessage = $"GraphQL error(s): {errorString}";
+                return;
+            }
+
+            IUpdateUser_UpdateUser payload = result.Data!.UpdateUser;
+
+            if (payload.User is not null) {
+                await ClosePasswordModal();
+            }
+            else if (payload.Errors is { Count: > 0 } validationErrors) {
+                IEnumerable<string> errorMessages = validationErrors.Select(error => $"{error.Code} : {error.Message}");
+                string errorString = string.Join(" | ", errorMessages);
+                _passwordErrorMessage = errorString;
+            }
+            else {
+                _passwordErrorMessage = "Update did not return a result. The password may not have been saved.";
+            }
+        }
+        catch (Exception ex) {
+            _passwordErrorMessage = $"Unexpected error: {ex.Message}";
+        }
+        finally {
+            _isUpdatingPassword = false;
+        }
     }
 }
 @* End @code *@
