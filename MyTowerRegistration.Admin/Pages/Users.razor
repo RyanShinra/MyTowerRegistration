@@ -422,9 +422,13 @@ else {
         _isUpdating = true;
 
         try {
+            // Null means "don't change anything" in the API
+            string? updatedUsername = _draftUsername != _activeEdit.Username ? _draftUsername : null;
+            string? updatedEmail = _draftEmail != _activeEdit.Email ? _draftEmail : null;
+
             IOperationResult<IUpdateUserResult> result =
-                await Client.UpdateUser.ExecuteAsync(
-                    _activeEdit.UserId, _draftUsername, _draftEmail, password: null);
+                await Client.UpdateUser.ExecuteAsync(_activeEdit.UserId, 
+                    updatedUsername, updatedEmail, password: null);
 
             // var topLevelErrors = result.Errors
             // if (topLevelErrors is not null && topLevelErrors.Count > 0) {
