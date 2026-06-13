@@ -341,6 +341,32 @@ aws cloudfront create-invalidation \
     --paths "/*" > /dev/null
 echo "CloudFront cache invalidated."
 
+# Ensure both 403 and 404 are mapped to /index.html for SPA routing.
+# When the bucket is private (OAC), S3 returns 403 for missing paths —
+# not 404. Without a 403 rule, navigating directly to any Blazor route
+# (e.g. /users) returns the raw S3 "Access Denied" XML instead of the app.
+CF_CONFIG_RESPONSE=$(aws cloudfront get-distribution-config --id "${CF_ID}")
+CF_ETAG=$(echo "${CF_CONFIG_RESPONSE}" | jq -r '.ETag')
+DIST_CONFIG=$(echo "${CF_CONFIG_RESPONSE}" | jq '.DistributionConfig')
+HAS_403=$(echo "${DIST_CONFIG}" | jq '[(.CustomErrorResponses.Items // [])[] | select(.ErrorCode == 403)] | length')
+if [ "${HAS_403}" -eq 0 ]; then
+    PATCHED_CONFIG=$(echo "${DIST_CONFIG}" | jq '
+        .CustomErrorResponses.Quantity += 1 |
+        .CustomErrorResponses.Items += [{
+            "ErrorCode": 403,
+            "ResponseCode": "200",
+            "ResponsePagePath": "/index.html",
+            "ErrorCachingMinTTL": 0
+        }]')
+    aws cloudfront update-distribution \
+        --id "${CF_ID}" \
+        --distribution-config "${PATCHED_CONFIG}" \
+        --if-match "${CF_ETAG}" > /dev/null
+    echo "CloudFront: added 403 → /index.html SPA routing rule."
+else
+    echo "CloudFront: 403 SPA routing rule already present."
+fi
+
 echo "OK"
 
 # =============================================================================

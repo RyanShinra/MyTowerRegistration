@@ -30,6 +30,7 @@
 @inject IMyTowerClient Client
 @* IJSRuntime: needed to call Bootstrap's modal JS API (show/hide) *@
 @inject IJSRuntime JS
+@inject ILogger<Users> Logger
 
 <PageTitle>Users — MyTower Admin</PageTitle>
 
@@ -69,14 +70,14 @@ else {
                         @if (_activeEdit?.UserId == user.Id) {
                             <button class="btn btn-outline-secondary btn-sm"
                                     @onclick="CancelEdit"
-                                    @disabled="@_isUpdating">
+                                    disabled="@_isUpdating">
                                 ⤴️ Close
                             </button>
                         }
                         else {
                             <button class="btn btn-outline-secondary btn-sm"
                                     @onclick="() => StartEdit(user)"
-                                    @disabled="@_isUpdating">
+                                    disabled="@_isUpdating">
                                 📝 Edit
                             </button>
                         }
@@ -84,7 +85,7 @@ else {
                     <td>
                         <button class="btn btn-danger btn-sm"
                                 @onclick="() => HandleDelete(user.Id)"
-                                @disabled="@(_deletionId is not null)">
+                                disabled="@(_deletionId is not null)">
                             @(_deletionId == user.Id ? "⏳ Deleting..." : "Delete")
                         </button>
                     </td>
@@ -112,12 +113,12 @@ else {
                         <td>
                             <button class="btn btn-success btn-sm"
                                     @onclick="HandleUpdate"
-                                    @disabled="@_isUpdating">
+                                    disabled="@_isUpdating">
                                 @(_isUpdating ? "⌛" : "Save")
                             </button>
                             <button class="btn btn-secondary btn-sm ms-1"
                                     @onclick="CancelEdit"
-                                    @disabled="@_isUpdating">
+                                    disabled="@_isUpdating">
                                 Cancel
                             </button>
                         </td>
@@ -170,12 +171,12 @@ else {
             <div class="modal-footer">
                 <button class="btn btn-success btn-sm"
                         @onclick="HandlePasswordUpdate"
-                        @disabled="@_isUpdatingPassword">
+                        disabled="@_isUpdatingPassword">
                     @(_isUpdatingPassword ? "📝 Saving..." : "Save")
                 </button>
                 <button class="btn btn-secondary btn-sm ms-1"
                         @onclick="ClosePasswordModal"
-                        @disabled="@_isUpdatingPassword">
+                        disabled="@_isUpdatingPassword">
                     Cancel
                 </button>
             </div>
@@ -486,7 +487,14 @@ else {
         _editPassword = null;
         _editPasswordConfirm = null;
         _passwordErrorMessage = null;
-        await JS.InvokeVoidAsync("bootstrapModalShow", _passwordModalRef);
+        try {
+            await JS.InvokeVoidAsync("bootstrapModalShow", _passwordModalRef);
+        }
+        catch (Exception ex) {
+            Logger.LogError(ex, "bootstrapModalShow failed");
+            const string msg = "Could not open the password dialog. Please try again.";
+            _updateErrorMessage = _updateErrorMessage is null ? msg : $"{_updateErrorMessage} | {msg}";
+        }
     }
 
     // =========================================================================
@@ -494,10 +502,16 @@ else {
     // =========================================================================
     private async Task ClosePasswordModal()
     {
-        _editPassword = null;
-        _editPasswordConfirm = null;
-        _passwordErrorMessage = null;
-        await JS.InvokeVoidAsync("bootstrapModalHide", _passwordModalRef);
+        try {
+            await JS.InvokeVoidAsync("bootstrapModalHide", _passwordModalRef);
+            _editPassword = null;
+            _editPasswordConfirm = null;
+            _passwordErrorMessage = null;
+        }
+        catch (Exception ex) {
+            Logger.LogError(ex, "bootstrapModalHide failed");
+            _passwordErrorMessage = "Could not close the dialog — click ✕ to retry or refresh the page.";
+        }
     }
 
     // =========================================================================
@@ -545,6 +559,10 @@ else {
 
             if (payload.User is not null) {
                 await ClosePasswordModal();
+                if (_passwordErrorMessage is not null) {
+                    _passwordErrorMessage = "Password saved. The dialog could not close automatically — " +
+                                            "click ✕ to retry or refresh the page.";
+                }
             }
             else if (payload.Errors is { Count: > 0 } validationErrors) {
                 IEnumerable<string> errorMessages = validationErrors.Select(error => $"{error.Code} : {error.Message}");
