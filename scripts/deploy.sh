@@ -348,7 +348,7 @@ echo "CloudFront cache invalidated."
 CF_CONFIG_RESPONSE=$(aws cloudfront get-distribution-config --id "${CF_ID}")
 CF_ETAG=$(echo "${CF_CONFIG_RESPONSE}" | jq -r '.ETag')
 DIST_CONFIG=$(echo "${CF_CONFIG_RESPONSE}" | jq '.DistributionConfig')
-HAS_403=$(echo "${DIST_CONFIG}" | jq '[.CustomErrorResponses.Items[] | select(.ErrorCode == 403)] | length')
+HAS_403=$(echo "${DIST_CONFIG}" | jq '[(.CustomErrorResponses.Items // [])[] | select(.ErrorCode == 403)] | length')
 if [ "${HAS_403}" -eq 0 ]; then
     PATCHED_CONFIG=$(echo "${DIST_CONFIG}" | jq '
         .CustomErrorResponses.Quantity += 1 |

@@ -30,6 +30,7 @@
 @inject IMyTowerClient Client
 @* IJSRuntime: needed to call Bootstrap's modal JS API (show/hide) *@
 @inject IJSRuntime JS
+@inject ILogger<Users> Logger
 
 <PageTitle>Users — MyTower Admin</PageTitle>
 
@@ -490,7 +491,9 @@ else {
             await JS.InvokeVoidAsync("bootstrapModalShow", _passwordModalRef);
         }
         catch (Exception ex) {
-            _updateErrorMessage = $"Could not open password dialog: {ex.Message}";
+            Logger.LogError(ex, "bootstrapModalShow failed");
+            const string msg = "Could not open the password dialog. Please try again.";
+            _updateErrorMessage = _updateErrorMessage is null ? msg : $"{_updateErrorMessage} | {msg}";
         }
     }
 
@@ -499,14 +502,15 @@ else {
     // =========================================================================
     private async Task ClosePasswordModal()
     {
-        _editPassword = null;
-        _editPasswordConfirm = null;
-        _passwordErrorMessage = null;
         try {
             await JS.InvokeVoidAsync("bootstrapModalHide", _passwordModalRef);
+            _editPassword = null;
+            _editPasswordConfirm = null;
+            _passwordErrorMessage = null;
         }
         catch (Exception ex) {
-            _passwordErrorMessage = $"Could not close dialog: {ex.Message}";
+            Logger.LogError(ex, "bootstrapModalHide failed");
+            _passwordErrorMessage = "Could not close the dialog — click ✕ to retry or refresh the page.";
         }
     }
 
@@ -555,6 +559,10 @@ else {
 
             if (payload.User is not null) {
                 await ClosePasswordModal();
+                if (_passwordErrorMessage is not null) {
+                    _passwordErrorMessage = "Password saved. The dialog could not close automatically — " +
+                                            "click ✕ to retry or refresh the page.";
+                }
             }
             else if (payload.Errors is { Count: > 0 } validationErrors) {
                 IEnumerable<string> errorMessages = validationErrors.Select(error => $"{error.Code} : {error.Message}");
