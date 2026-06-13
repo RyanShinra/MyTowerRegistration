@@ -69,14 +69,14 @@ else {
                         @if (_activeEdit?.UserId == user.Id) {
                             <button class="btn btn-outline-secondary btn-sm"
                                     @onclick="CancelEdit"
-                                    @disabled="@_isUpdating">
+                                    disabled="@_isUpdating">
                                 ⤴️ Close
                             </button>
                         }
                         else {
                             <button class="btn btn-outline-secondary btn-sm"
                                     @onclick="() => StartEdit(user)"
-                                    @disabled="@_isUpdating">
+                                    disabled="@_isUpdating">
                                 📝 Edit
                             </button>
                         }
@@ -84,7 +84,7 @@ else {
                     <td>
                         <button class="btn btn-danger btn-sm"
                                 @onclick="() => HandleDelete(user.Id)"
-                                @disabled="@(_deletionId is not null)">
+                                disabled="@(_deletionId is not null)">
                             @(_deletionId == user.Id ? "⏳ Deleting..." : "Delete")
                         </button>
                     </td>
@@ -112,12 +112,12 @@ else {
                         <td>
                             <button class="btn btn-success btn-sm"
                                     @onclick="HandleUpdate"
-                                    @disabled="@_isUpdating">
+                                    disabled="@_isUpdating">
                                 @(_isUpdating ? "⌛" : "Save")
                             </button>
                             <button class="btn btn-secondary btn-sm ms-1"
                                     @onclick="CancelEdit"
-                                    @disabled="@_isUpdating">
+                                    disabled="@_isUpdating">
                                 Cancel
                             </button>
                         </td>
@@ -170,12 +170,12 @@ else {
             <div class="modal-footer">
                 <button class="btn btn-success btn-sm"
                         @onclick="HandlePasswordUpdate"
-                        @disabled="@_isUpdatingPassword">
+                        disabled="@_isUpdatingPassword">
                     @(_isUpdatingPassword ? "📝 Saving..." : "Save")
                 </button>
                 <button class="btn btn-secondary btn-sm ms-1"
                         @onclick="ClosePasswordModal"
-                        @disabled="@_isUpdatingPassword">
+                        disabled="@_isUpdatingPassword">
                     Cancel
                 </button>
             </div>
